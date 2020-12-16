@@ -20,10 +20,13 @@ import (
 	"github.com/devfile/devworkspace-operator/controllers/controller/workspacerouting"
 	"github.com/devfile/devworkspace-operator/controllers/controller/workspacerouting/solvers"
 	corev1 "k8s.io/api/core/v1"
-	networkingv1beta1 "k8s.io/api/networking/v1beta1"
+	extensions "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+
+	"github.com/che-incubator/devworkspace-che-routing-controller/pkg/router"
+	"github.com/che-incubator/devworkspace-che-routing-controller/pkg/solver"
 )
 
 var (
@@ -31,9 +34,11 @@ var (
 	setupLog = ctrl.Log.WithName("setup")
 )
 
+var _ router.CheRouterGetter = (*router.CheRouterReconciler)(nil)
+
 func init() {
 	controllerv1alpha1.AddToScheme(scheme)
-	networkingv1beta1.AddToScheme(scheme)
+	extensions.AddToScheme(scheme)
 	corev1.AddToScheme(scheme)
 }
 
@@ -62,16 +67,28 @@ func main() {
 		os.Exit(1)
 	}
 
-	reconciler := &workspacerouting.WorkspaceRoutingReconciler{
+	routerReconciler := &router.CheRouterReconciler{}
+	if err = routerReconciler.SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "CheRouter")
+		os.Exit(1)
+	}
+
+	routingReconciler := &workspacerouting.WorkspaceRoutingReconciler{
 		Client: mgr.GetClient(),
 		Log:    ctrl.Log.WithName("controllers").WithName("CheWorkspaceRouting"),
 		Scheme: mgr.GetScheme(),
-		GetSolverFunc: func(routingClass controllerv1alpha1.WorkspaceRoutingClass) (solver solvers.RoutingSolver, err error) {
-			return nil, nil
+		GetSolverFunc: func(routingClass controllerv1alpha1.WorkspaceRoutingClass) (solvers.RoutingSolver, error) {
+			if routingClass != "che" {
+				return nil, workspacerouting.RoutingNotSupported
+			}
+
+			var getter router.CheRouterGetter = routerReconciler
+
+			return solver.New(mgr.GetClient(), mgr.GetScheme(), &getter), nil
 		},
 	}
-	if err = reconciler.SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "CheWorkspaceRouting")
+	if err = routingReconciler.SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "CheWorkspaceRoutingSolver")
 		os.Exit(1)
 	}
 

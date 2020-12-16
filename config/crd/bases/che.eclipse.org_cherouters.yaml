@@ -1,0 +1,63 @@
+
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.4.1
+  creationTimestamp: null
+  name: cherouters.che.eclipse.org
+spec:
+  group: che.eclipse.org
+  names:
+    kind: CheRouter
+    listKind: CheRouterList
+    plural: cherouters
+    singular: cherouter
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: CheRouter is the schema for the che router api
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: CheRouterSpec holds the configuration of the Che routing
+              controller. Currently on a single object of this type is handled in
+              the cluster.
+            properties:
+              exposureType:
+                description: ExposureType defines how the Che Router exposes the workspaces
+                  and components within
+                type: string
+            type: object
+          status:
+            properties:
+              gatewayDeploymentName:
+                type: string
+              gatewayPhase:
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
