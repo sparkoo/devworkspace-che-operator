@@ -19,14 +19,16 @@ import (
 	controllerv1alpha1 "github.com/devfile/devworkspace-operator/apis/controller/v1alpha1"
 	"github.com/devfile/devworkspace-operator/controllers/controller/workspacerouting"
 	"github.com/devfile/devworkspace-operator/controllers/controller/workspacerouting/solvers"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
+	rbac "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	"github.com/che-incubator/devworkspace-che-operator/apis/che-controller/v1alpha1"
-	"github.com/che-incubator/devworkspace-che-operator/pkg/router"
+	router "github.com/che-incubator/devworkspace-che-operator/pkg/manager"
 	"github.com/che-incubator/devworkspace-che-operator/pkg/solver"
 )
 
@@ -40,6 +42,8 @@ func init() {
 	controllerv1alpha1.AddToScheme(scheme)
 	extensions.AddToScheme(scheme)
 	corev1.AddToScheme(scheme)
+	appsv1.AddToScheme(scheme)
+	rbac.AddToScheme(scheme)
 }
 
 func main() {
