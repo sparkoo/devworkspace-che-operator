@@ -23,10 +23,9 @@ const (
 	MultiHost  RoutingType = "multihost"
 )
 
-// CheRouterSpec holds the configuration of the Che routing controller.
-// Currently on a single object of this type is handled in the cluster.
+// CheSpec holds the configuration of the Che controller.
 // +k8s:openapi-gen=true
-type CheRouterSpec struct {
+type CheSpec struct {
 	// The hostname to use for creating the workspace endpoints
 	// This is used as a full hostname in the singlehost mode. In the multihost mode, the individual
 	// endpoints are exposed on subdomains of the specified host.
@@ -35,49 +34,46 @@ type CheRouterSpec struct {
 	// Routing defines how the Che Router exposes the workspaces and components within
 	Routing RoutingType `json:"routing,omitempty"`
 
-	// GatewayImage is the docker image to use for the Che gateway. If not defined in the CR,
-	// it is taken from the `RELATED_IMAGE_gateway` environment variable of the che routing
-	// operator deployment/pod. If not defined there it defaults to a hardcoded value.
+	// GatewayImage is the docker image to use for the Che gateway.  This is only used in
+	// the singlehost mode. If not defined in the CR, it is taken from
+	// the `RELATED_IMAGE_gateway` environment variable of the che operator
+	// deployment/pod. If not defined there it defaults to a hardcoded value.
 	GatewayImage string `json:"gatewayImage,omitempty"`
 
 	// GatewayConfigureImage is the docker image to use for the sidecar of the Che gateway that is
-	// used to configure it. If not defined in the CR, it is taken from the `RELATED_IMAGE_gateway_configurer`
-	// environment variable of the che routing operator deployment/pod. If not defined there it defaults to
-	// a hardcoded value.
+	// used to configure it. This is only used in the singlehost mode. If not defined in the CR,
+	// it is taken from the `RELATED_IMAGE_gateway_configurer` environment variable of the che
+	// operator deployment/pod. If not defined there it defaults to a hardcoded value.
 	GatewayConfigurerImage string `json:"gatewayConfigurerImage,omitempty"`
-
-	// TODO in the future we could theoretically add support for having multiple che routers
-	// by being able to specify an explicit routing class here for each router. Alternatively,
-	// we could just use the router's name as the routing class for example.
 }
 
 // +k8s:openapi-gen=true
-type CheRouterStatus struct {
+type CheStatus struct {
 	GatewayPhase string `json:"gatewayPhase,omitempty"`
 }
 
-// CheRouter is the schema for the che router api
+// Che is the configuration of the Che layer of Devworkspace.
 // +k8s:openapi-gen=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:path=cherouters,scope=Namespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-type CheRouter struct {
+type Che struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   CheRouterSpec   `json:"spec,omitempty"`
-	Status CheRouterStatus `json:"status,omitempty"`
+	Spec   CheSpec   `json:"spec,omitempty"`
+	Status CheStatus `json:"status,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// CheRouterList is the list type for CheRouter
-type CheRouterList struct {
+// CheList is the list type for Che
+type CheList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []CheRouter `json:"items"`
+	Items           []Che `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&CheRouter{}, &CheRouterList{})
+	SchemeBuilder.Register(&Che{}, &CheList{})
 }

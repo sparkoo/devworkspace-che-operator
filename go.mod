@@ -1,4 +1,4 @@
-module github.com/che-incubator/devworkspace-che-routing-controller
+module github.com/che-incubator/devworkspace-che-operator
 
 go 1.13
 

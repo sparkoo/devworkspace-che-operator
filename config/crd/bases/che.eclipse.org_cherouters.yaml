@@ -10,16 +10,16 @@ metadata:
 spec:
   group: che.eclipse.org
   names:
-    kind: CheRouter
-    listKind: CheRouterList
+    kind: Che
+    listKind: CheList
     plural: cherouters
-    singular: cherouter
+    singular: che
   scope: Namespaced
   versions:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: CheRouter is the schema for the che router api
+        description: Che is the configuration of the Che layer of Devworkspace.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -34,19 +34,36 @@ spec:
           metadata:
             type: object
           spec:
-            description: CheRouterSpec holds the configuration of the Che routing
-              controller. Currently on a single object of this type is handled in
-              the cluster.
+            description: CheSpec holds the configuration of the Che controller.
             properties:
-              exposureType:
-                description: ExposureType defines how the Che Router exposes the workspaces
+              gatewayConfigurerImage:
+                description: GatewayConfigureImage is the docker image to use for
+                  the sidecar of the Che gateway that is used to configure it. This
+                  is only used in the singlehost mode. If not defined in the CR, it
+                  is taken from the `RELATED_IMAGE_gateway_configurer` environment
+                  variable of the che operator deployment/pod. If not defined there
+                  it defaults to a hardcoded value.
+                type: string
+              gatewayImage:
+                description: GatewayImage is the docker image to use for the Che gateway.  This
+                  is only used in the singlehost mode. If not defined in the CR, it
+                  is taken from the `RELATED_IMAGE_gateway` environment variable of
+                  the che operator deployment/pod. If not defined there it defaults
+                  to a hardcoded value.
+                type: string
+              host:
+                description: The hostname to use for creating the workspace endpoints
+                  This is used as a full hostname in the singlehost mode. In the multihost
+                  mode, the individual endpoints are exposed on subdomains of the
+                  specified host.
+                type: string
+              routing:
+                description: Routing defines how the Che Router exposes the workspaces
                   and components within
                 type: string
             type: object
           status:
             properties:
-              gatewayDeploymentName:
-                type: string
               gatewayPhase:
                 type: string
             type: object

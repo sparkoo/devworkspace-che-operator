@@ -4,7 +4,7 @@ import (
 	"os"
 	"runtime"
 
-	"github.com/che-incubator/devworkspace-che-routing-controller/apis/che-controller/v1alpha1"
+	"github.com/che-incubator/devworkspace-che-operator/apis/che-controller/v1alpha1"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
@@ -20,7 +20,7 @@ var (
 	log = ctrl.Log.WithName("defaults")
 )
 
-func GetLabels(router *v1alpha1.CheRouter, component string) map[string]string {
+func GetLabels(router *v1alpha1.Che, component string) map[string]string {
 	return map[string]string{
 		"app.kubernetes.io/name":      router.Name,
 		"app.kubernetes.io/part-of":   router.Name,

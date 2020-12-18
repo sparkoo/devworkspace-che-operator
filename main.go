@@ -25,16 +25,14 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	"github.com/che-incubator/devworkspace-che-routing-controller/pkg/router"
-	"github.com/che-incubator/devworkspace-che-routing-controller/pkg/solver"
+	"github.com/che-incubator/devworkspace-che-operator/pkg/router"
+	"github.com/che-incubator/devworkspace-che-operator/pkg/solver"
 )
 
 var (
 	scheme   = runtime.NewScheme()
 	setupLog = ctrl.Log.WithName("setup")
 )
-
-var _ router.CheRouterGetter = (*router.CheRouterReconciler)(nil)
 
 func init() {
 	controllerv1alpha1.AddToScheme(scheme)
@@ -67,24 +65,22 @@ func main() {
 		os.Exit(1)
 	}
 
-	routerReconciler := &router.CheRouterReconciler{}
-	if err = routerReconciler.SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "CheRouter")
+	cheReconciler := &router.CheReconciler{}
+	if err = cheReconciler.SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "Che")
 		os.Exit(1)
 	}
 
 	routingReconciler := &workspacerouting.WorkspaceRoutingReconciler{
 		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("CheWorkspaceRouting"),
+		Log:    ctrl.Log.WithName("controllers").WithName("WorkspaceRouting"),
 		Scheme: mgr.GetScheme(),
 		GetSolverFunc: func(routingClass controllerv1alpha1.WorkspaceRoutingClass) (solvers.RoutingSolver, error) {
 			if routingClass != "che" {
 				return nil, workspacerouting.RoutingNotSupported
 			}
 
-			var getter router.CheRouterGetter = routerReconciler
-
-			return solver.New(mgr.GetClient(), mgr.GetScheme(), &getter), nil
+			return solver.New(mgr.GetClient(), mgr.GetScheme()), nil
 		},
 	}
 	if err = routingReconciler.SetupWithManager(mgr); err != nil {
