@@ -1,2 +1,3 @@
-= Che Routing Controller for DevWorkspaces
+= Che Manager Controller for DevWorkspaces
 
+An experimental operator that enhances https://github.com/devfile/devworkspace-operator[Devworkspaces] with Che-specific functionality.
