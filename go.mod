@@ -15,4 +15,4 @@ require (
 	sigs.k8s.io/controller-runtime v0.6.3
 )
 
-replace github.com/devfile/devworkspace-operator => github.com/amisevsk/devworkspace-operator v0.0.0-20201211032043-0c70133bee40
+replace github.com/devfile/devworkspace-operator => github.com/amisevsk/devworkspace-operator v0.0.0-20201217181813-eef913fb3897
