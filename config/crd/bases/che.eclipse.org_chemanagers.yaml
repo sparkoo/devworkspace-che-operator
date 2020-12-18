@@ -6,20 +6,20 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.4.1
   creationTimestamp: null
-  name: cherouters.che.eclipse.org
+  name: chemanagers.che.eclipse.org
 spec:
   group: che.eclipse.org
   names:
-    kind: Che
-    listKind: CheList
-    plural: cherouters
-    singular: che
+    kind: CheManager
+    listKind: CheManagerList
+    plural: chemanagers
+    singular: chemanager
   scope: Namespaced
   versions:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: Che is the configuration of the Che layer of Devworkspace.
+        description: CheManager is the configuration of the CheManager layer of Devworkspace.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -34,7 +34,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: CheSpec holds the configuration of the Che controller.
+            description: CheManagerSpec holds the configuration of the Che controller.
             properties:
               gatewayConfigurerImage:
                 description: GatewayConfigureImage is the docker image to use for

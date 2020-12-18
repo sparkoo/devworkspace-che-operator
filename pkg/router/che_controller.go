@@ -47,7 +47,7 @@ func (r *CheReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.gateway.Scheme = mgr.GetScheme()
 
 	bld := ctrl.NewControllerManagedBy(mgr).
-		For(&v1alpha1.Che{}).
+		For(&v1alpha1.CheManager{}).
 		Owns(&corev1.Service{}).
 		Owns(&v1beta1.Ingress{}).
 		Owns(&corev1.ConfigMap{}).
@@ -80,7 +80,7 @@ func (r *CheReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
 
 	// make sure we've checked we're in a valid state
-	current := &v1alpha1.Che{}
+	current := &v1alpha1.CheManager{}
 	err := r.Get(ctx, req.NamespacedName, current)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -110,7 +110,7 @@ func (r *CheReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	return ctrl.Result{}, nil
 }
 
-func (r *CheReconciler) finalize(router *v1alpha1.Che) error {
+func (r *CheReconciler) finalize(router *v1alpha1.CheManager) error {
 	// implement if needed
 	return nil
 }

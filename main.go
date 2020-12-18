@@ -25,6 +25,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	"github.com/che-incubator/devworkspace-che-operator/apis/che-controller/v1alpha1"
 	"github.com/che-incubator/devworkspace-che-operator/pkg/router"
 	"github.com/che-incubator/devworkspace-che-operator/pkg/solver"
 )
@@ -35,6 +36,7 @@ var (
 )
 
 func init() {
+	v1alpha1.AddToScheme(scheme)
 	controllerv1alpha1.AddToScheme(scheme)
 	extensions.AddToScheme(scheme)
 	corev1.AddToScheme(scheme)

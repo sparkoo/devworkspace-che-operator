@@ -23,9 +23,9 @@ const (
 	MultiHost  RoutingType = "multihost"
 )
 
-// CheSpec holds the configuration of the Che controller.
+// CheManagerSpec holds the configuration of the Che controller.
 // +k8s:openapi-gen=true
-type CheSpec struct {
+type CheManagerSpec struct {
 	// The hostname to use for creating the workspace endpoints
 	// This is used as a full hostname in the singlehost mode. In the multihost mode, the individual
 	// endpoints are exposed on subdomains of the specified host.
@@ -48,32 +48,32 @@ type CheSpec struct {
 }
 
 // +k8s:openapi-gen=true
-type CheStatus struct {
+type CheManagerStatus struct {
 	GatewayPhase string `json:"gatewayPhase,omitempty"`
 }
 
-// Che is the configuration of the Che layer of Devworkspace.
+// CheManager is the configuration of the CheManager layer of Devworkspace.
 // +k8s:openapi-gen=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:path=cherouters,scope=Namespaced
+// +kubebuilder:resource:path=chemanagers,scope=Namespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-type Che struct {
+type CheManager struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   CheSpec   `json:"spec,omitempty"`
-	Status CheStatus `json:"status,omitempty"`
+	Spec   CheManagerSpec   `json:"spec,omitempty"`
+	Status CheManagerStatus `json:"status,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// CheList is the list type for Che
-type CheList struct {
+// CheManagerList is the list type for Che
+type CheManagerList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []Che `json:"items"`
+	Items           []CheManager `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&Che{}, &CheList{})
+	SchemeBuilder.Register(&CheManager{}, &CheManagerList{})
 }
