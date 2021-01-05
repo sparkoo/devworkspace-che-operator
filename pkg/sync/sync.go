@@ -16,7 +16,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/go-logr/logr"
 	"github.com/google/go-cmp/cmp"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,16 +29,14 @@ var (
 	log = ctrl.Log.WithName("sync")
 )
 
+// Syncer synchronized K8s objects with the cluster
 type Syncer struct {
-	client.Client
-	Scheme *runtime.Scheme
+	client client.Client
+	scheme *runtime.Scheme
 }
 
-type SyncContext struct {
-	Client client.Client
-	Log    logr.Logger
-	Scheme *runtime.Scheme
-	Owner  metav1.Object
+func New(client client.Client, scheme *runtime.Scheme) Syncer {
+	return Syncer{client: client, scheme: scheme}
 }
 
 // Sync syncs the blueprint to the cluster in a generic (as much as Go allows) manner.
@@ -54,7 +51,7 @@ func (s *Syncer) Sync(ctx context.Context, owner metav1.Object, blueprint metav1
 
 	actual := blueprintObject.DeepCopyObject()
 
-	if getErr := s.Get(context.TODO(), key, actual); getErr != nil {
+	if getErr := s.client.Get(context.TODO(), key, actual); getErr != nil {
 		if statusErr, ok := getErr.(*errors.StatusError); !ok || statusErr.Status().Reason != metav1.StatusReasonNotFound {
 			return false, getErr
 		}
@@ -88,7 +85,7 @@ func (s *Syncer) create(ctx context.Context, owner metav1.Object, key client.Obj
 		return nil, err
 	}
 
-	err = s.Create(ctx, obj)
+	err = s.client.Create(ctx, obj)
 	if err != nil {
 		if !errors.IsAlreadyExists(err) {
 			return nil, err
@@ -97,7 +94,7 @@ func (s *Syncer) create(ctx context.Context, owner metav1.Object, key client.Obj
 		// ok, we got an already-exists error. So let's try to load the object into "actual".
 		// if we fail this retry for whatever reason, just give up rather than retrying this in a loop...
 		// the reconciliation loop will lead us here again in the next round.
-		if getErr := s.Get(ctx, key, actual); getErr != nil {
+		if getErr := s.client.Get(ctx, key, actual); getErr != nil {
 			return nil, getErr
 		}
 	}
@@ -113,8 +110,31 @@ func (s *Syncer) update(ctx context.Context, owner metav1.Object, actual runtime
 		kind := actual.GetObjectKind().GroupVersionKind().Kind
 		log.Info("Updating existing object", "kind", kind, "name", actualMeta.GetName(), "namespace", actualMeta.GetNamespace())
 
+		// we need to handle labels and annotations specially in case the cluster admin has modified them.
+		// if the current object in the cluster has the same annos/labels, they get overwritten with what's
+		// in the blueprint. Any additional labels/annos on the object are kept though.
+		targetLabels := map[string]string{}
+		targetAnnos := map[string]string{}
+
+		for k, v := range actualMeta.GetAnnotations() {
+			targetAnnos[k] = v
+		}
+		for k, v := range actualMeta.GetLabels() {
+			targetLabels[k] = v
+		}
+
+		for k, v := range blueprint.GetAnnotations() {
+			targetAnnos[k] = v
+		}
+		for k, v := range blueprint.GetLabels() {
+			targetLabels[k] = v
+		}
+
+		blueprint.SetAnnotations(targetAnnos)
+		blueprint.SetLabels(targetLabels)
+
 		if isUpdateUsingDeleteCreate(actual.GetObjectKind().GroupVersionKind().Kind) {
-			err := s.Delete(ctx, actual)
+			err := s.client.Delete(ctx, actual)
 			if err != nil {
 				return false, err
 			}
@@ -124,7 +144,7 @@ func (s *Syncer) update(ctx context.Context, owner metav1.Object, actual runtime
 				return false, err
 			}
 
-			err = s.Create(ctx, obj)
+			err = s.client.Create(ctx, obj)
 			if err != nil {
 				return false, err
 			}
@@ -137,7 +157,7 @@ func (s *Syncer) update(ctx context.Context, owner metav1.Object, actual runtime
 			// to be able to update, we need to set the resource version of the object that we know of
 			obj.(metav1.Object).SetResourceVersion(actualMeta.GetResourceVersion())
 
-			err = s.Update(ctx, obj)
+			err = s.client.Update(ctx, obj)
 			if err != nil {
 				return false, err
 			}
@@ -164,7 +184,7 @@ func (s *Syncer) setOwnerReferenceAndConvertToRuntime(owner metav1.Object, obj m
 		return robj, nil
 	}
 
-	err := controllerutil.SetControllerReference(owner, obj, s.Scheme)
+	err := controllerutil.SetControllerReference(owner, obj, s.scheme)
 	if err != nil {
 		return nil, err
 	}

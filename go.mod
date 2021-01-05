@@ -3,7 +3,7 @@ module github.com/che-incubator/devworkspace-che-operator
 go 1.13
 
 require (
-	github.com/devfile/devworkspace-operator v0.0.0
+	github.com/devfile/devworkspace-operator v0.0.0-20201224151353-1b7df8fb9d7c
 	github.com/go-logr/logr v0.1.0
 	github.com/golang/groupcache v0.0.0-20190702054246-869f871628b6 // indirect
 	github.com/google/go-cmp v0.5.0
@@ -14,5 +14,3 @@ require (
 	k8s.io/apimachinery v0.18.8
 	sigs.k8s.io/controller-runtime v0.6.3
 )
-
-replace github.com/devfile/devworkspace-operator => github.com/amisevsk/devworkspace-operator v0.0.0-20201217181813-eef913fb3897

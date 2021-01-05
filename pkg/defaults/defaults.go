@@ -20,10 +20,14 @@ var (
 	log = ctrl.Log.WithName("defaults")
 )
 
-func GetLabels(router *v1alpha1.CheManager, component string) map[string]string {
+func GetLabelsForComponent(router *v1alpha1.CheManager, component string) map[string]string {
+	return GetLabelsFromNames(router.Name, component)
+}
+
+func GetLabelsFromNames(appName string, component string) map[string]string {
 	return map[string]string{
-		"app.kubernetes.io/name":      router.Name,
-		"app.kubernetes.io/part-of":   router.Name,
+		"app.kubernetes.io/name":      appName,
+		"app.kubernetes.io/part-of":   appName,
 		"app.kubernetes.io/component": component,
 	}
 }

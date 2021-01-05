@@ -56,13 +56,13 @@ var (
 )
 
 type CheGateway struct {
-	client.Client
-	Scheme *runtime.Scheme
+	client client.Client
+	scheme *runtime.Scheme
 }
 
 func (g *CheGateway) Sync(ctx context.Context, router *v1alpha1.CheManager) error {
 
-	syncer := sync.Syncer{Client: g.Client, Scheme: g.Scheme}
+	syncer := sync.New(g.client, g.scheme)
 
 	sa := getGatewayServiceAccountSpec(router)
 	if _, err := syncer.Sync(ctx, router, &sa, serviceAccountDiffOpts); err != nil {
@@ -124,7 +124,7 @@ func (g *CheGateway) Delete(ctx context.Context, router *v1alpha1.CheManager) er
 			Namespace: router.Namespace,
 		},
 	}
-	if err := g.delete(ctx, &roleBinding); err == nil {
+	if err := g.delete(ctx, &roleBinding); err != nil {
 		return err
 	}
 
@@ -134,7 +134,7 @@ func (g *CheGateway) Delete(ctx context.Context, router *v1alpha1.CheManager) er
 			Namespace: router.Namespace,
 		},
 	}
-	if err := g.delete(ctx, &role); err == nil {
+	if err := g.delete(ctx, &role); err != nil {
 		return err
 	}
 
@@ -144,7 +144,17 @@ func (g *CheGateway) Delete(ctx context.Context, router *v1alpha1.CheManager) er
 			Namespace: router.Namespace,
 		},
 	}
-	if err := g.delete(ctx, &sa); err == nil {
+	if err := g.delete(ctx, &sa); err != nil {
+		return err
+	}
+
+	service := corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      router.Name,
+			Namespace: router.Namespace,
+		},
+	}
+	if err := g.delete(ctx, &service); err != nil {
 		return err
 	}
 
@@ -154,8 +164,8 @@ func (g *CheGateway) Delete(ctx context.Context, router *v1alpha1.CheManager) er
 func (g *CheGateway) delete(ctx context.Context, obj metav1.Object) error {
 	key := client.ObjectKey{Name: obj.GetName(), Namespace: obj.GetNamespace()}
 	ro := obj.(runtime.Object)
-	if getErr := g.Get(ctx, key, ro); getErr == nil {
-		if err := g.Client.Delete(ctx, ro); err != nil {
+	if getErr := g.client.Get(ctx, key, ro); getErr == nil {
+		if err := g.client.Delete(ctx, ro); err != nil {
 			if !errors.IsNotFound(err) {
 				return err
 			}
@@ -176,7 +186,7 @@ func getGatewayServiceAccountSpec(router *v1alpha1.CheManager) corev1.ServiceAcc
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      router.Name,
 			Namespace: router.Namespace,
-			Labels:    defaults.GetLabels(router, "security"),
+			Labels:    defaults.GetLabelsForComponent(router, "security"),
 		},
 	}
 }
@@ -190,7 +200,7 @@ func getGatewayRoleSpec(router *v1alpha1.CheManager) rbac.Role {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      router.Name,
 			Namespace: router.Namespace,
-			Labels:    defaults.GetLabels(router, "security"),
+			Labels:    defaults.GetLabelsForComponent(router, "security"),
 		},
 		Rules: []rbac.PolicyRule{
 			{
@@ -211,7 +221,7 @@ func getGatewayRoleBindingSpec(router *v1alpha1.CheManager) rbac.RoleBinding {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      router.Name,
 			Namespace: router.Namespace,
-			Labels:    defaults.GetLabels(router, "security"),
+			Labels:    defaults.GetLabelsForComponent(router, "security"),
 		},
 		RoleRef: rbac.RoleRef{
 			APIGroup: "rbac.authorization.k8s.io",
@@ -236,7 +246,7 @@ func getGatewayTraefikConfigSpec(router *v1alpha1.CheManager) corev1.ConfigMap {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      router.Name,
 			Namespace: router.Namespace,
-			Labels:    defaults.GetLabels(router, "gateway-config"),
+			Labels:    defaults.GetLabelsForComponent(router, "gateway-config"),
 		},
 		Data: map[string]string{
 			"traefik.yml": `
@@ -276,18 +286,18 @@ func getGatewayDeploymentSpec(router *v1alpha1.CheManager) appsv1.Deployment {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      router.Name,
 			Namespace: router.Namespace,
-			Labels:    defaults.GetLabels(router, "deployment"),
+			Labels:    defaults.GetLabelsForComponent(router, "deployment"),
 		},
 		Spec: appsv1.DeploymentSpec{
 			Selector: &metav1.LabelSelector{
-				MatchLabels: defaults.GetLabels(router, "deployment"),
+				MatchLabels: defaults.GetLabelsForComponent(router, "deployment"),
 			},
 			Strategy: appsv1.DeploymentStrategy{
 				Type: appsv1.RollingUpdateDeploymentStrategyType,
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: defaults.GetLabels(router, "deployment"),
+					Labels: defaults.GetLabelsForComponent(router, "deployment"),
 				},
 				Spec: corev1.PodSpec{
 					TerminationGracePeriodSeconds: &terminationGracePeriodSeconds,
@@ -326,7 +336,7 @@ func getGatewayDeploymentSpec(router *v1alpha1.CheManager) appsv1.Deployment {
 								},
 								{
 									Name:  "CONFIG_BUMP_LABELS",
-									Value: labels.FormatLabels(defaults.GetLabels(router, "gateway-config")),
+									Value: labels.FormatLabels(defaults.GetLabelsForComponent(router, "gateway-config")),
 								},
 								{
 									Name: "CONFIG_BUMP_NAMESPACE",
@@ -373,10 +383,10 @@ func getGatewayServiceSpec(router *v1alpha1.CheManager) corev1.Service {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      router.Name,
 			Namespace: router.Namespace,
-			Labels:    defaults.GetLabels(router, "deployment"),
+			Labels:    defaults.GetLabelsForComponent(router, "deployment"),
 		},
 		Spec: corev1.ServiceSpec{
-			Selector:        defaults.GetLabels(router, "deployment"),
+			Selector:        defaults.GetLabelsForComponent(router, "deployment"),
 			SessionAffinity: corev1.ServiceAffinityNone,
 			Type:            corev1.ServiceTypeClusterIP,
 			Ports: []corev1.ServicePort{

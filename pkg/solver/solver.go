@@ -26,7 +26,7 @@ var (
 
 // CheRoutingSolver is a struct representing the routing solver for Che specific routing of workspaces
 type CheRoutingSolver struct {
-	client.Client
+	client client.Client
 	scheme *runtime.Scheme
 }
 
@@ -59,7 +59,7 @@ func (g *CheRouterGetter) GetSolver(client client.Client, routingClass controlle
 	if !isSupported(routingClass) {
 		return nil, solvers.RoutingNotSupported
 	}
-	return &CheRoutingSolver{Client: client, scheme: g.scheme}, nil
+	return &CheRoutingSolver{client: client, scheme: g.scheme}, nil
 }
 
 // GetSpecObjects constructs cluster routing objects which should be applied on the cluster

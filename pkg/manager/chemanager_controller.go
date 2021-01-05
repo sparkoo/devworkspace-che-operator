@@ -35,16 +35,16 @@ var (
 )
 
 type CheReconciler struct {
-	client.Client
-	Scheme  *runtime.Scheme
+	client  client.Client
+	scheme  *runtime.Scheme
 	gateway CheGateway
 }
 
 func (r *CheReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	r.Client = mgr.GetClient()
-	r.Scheme = mgr.GetScheme()
-	r.gateway.Client = mgr.GetClient()
-	r.gateway.Scheme = mgr.GetScheme()
+	r.client = mgr.GetClient()
+	r.scheme = mgr.GetScheme()
+	r.gateway.client = mgr.GetClient()
+	r.gateway.scheme = mgr.GetScheme()
 
 	bld := ctrl.NewControllerManagedBy(mgr).
 		For(&v1alpha1.CheManager{}).
@@ -61,16 +61,16 @@ func (r *CheReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	}
 	bld.WithEventFilter(predicate.Funcs{
 		CreateFunc: func(ev event.CreateEvent) bool {
-			return isCheRoute(ev.Object)
+			return isChe(ev.Object)
 		},
 		DeleteFunc: func(ev event.DeleteEvent) bool {
-			return isCheRoute(ev.Object)
+			return isChe(ev.Object)
 		},
 		UpdateFunc: func(ev event.UpdateEvent) bool {
-			return isCheRoute(ev.ObjectNew)
+			return isChe(ev.ObjectNew)
 		},
 		GenericFunc: func(ev event.GenericEvent) bool {
-			return isCheRoute(ev.Object)
+			return isChe(ev.Object)
 		},
 	})
 	return bld.Complete(r)
@@ -81,7 +81,7 @@ func (r *CheReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 
 	// make sure we've checked we're in a valid state
 	current := &v1alpha1.CheManager{}
-	err := r.Get(ctx, req.NamespacedName, current)
+	err := r.client.Get(ctx, req.NamespacedName, current)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Ok, our current router disappeared...
@@ -115,6 +115,6 @@ func (r *CheReconciler) finalize(router *v1alpha1.CheManager) error {
 	return nil
 }
 
-func isCheRoute(obj runtime.Object) bool {
+func isChe(obj runtime.Object) bool {
 	return obj.GetObjectKind().GroupVersionKind().Kind == "Che"
 }
