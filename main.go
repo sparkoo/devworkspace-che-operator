@@ -27,7 +27,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	"github.com/che-incubator/devworkspace-che-operator/apis/che-controller/v1alpha1"
-	router "github.com/che-incubator/devworkspace-che-operator/pkg/manager"
+	"github.com/che-incubator/devworkspace-che-operator/pkg/infrastructure"
+	"github.com/che-incubator/devworkspace-che-operator/pkg/manager"
 	"github.com/che-incubator/devworkspace-che-operator/pkg/solver"
 )
 
@@ -57,6 +58,11 @@ func main() {
 
 	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
 
+	if infrastructure.Current.Type == infrastructure.Undetected {
+		setupLog.Error(nil, "Unable to detect the Kubernetes infrastructure.")
+		os.Exit(1)
+	}
+
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:             scheme,
 		MetricsBindAddress: metricsAddr,
@@ -70,7 +76,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	cheReconciler := &router.CheReconciler{}
+	cheReconciler := &manager.CheReconciler{}
 	if err = cheReconciler.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Che")
 		os.Exit(1)

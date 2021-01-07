@@ -70,6 +70,27 @@ func (s *Syncer) Sync(ctx context.Context, owner metav1.Object, blueprint metav1
 	return s.update(ctx, owner, actual, blueprint, diffOpts)
 }
 
+// Delete deletes the supplied object from the cluster.
+func (s *Syncer) Delete(ctx context.Context, object metav1.Object) error {
+	key := client.ObjectKey{Name: object.GetName(), Namespace: object.GetNamespace()}
+
+	var err error
+	ro, ok := object.(runtime.Object)
+	if !ok {
+		return fmt.Errorf("Could not use the supplied object as kubernetes runtime object. That's unexpected: %s", object)
+	}
+
+	if err = s.client.Get(ctx, key, ro); err == nil {
+		err = s.client.Delete(ctx, ro)
+	}
+
+	if err != nil && !errors.IsNotFound(err) {
+		return err
+	}
+
+	return nil
+}
+
 func (s *Syncer) create(ctx context.Context, owner metav1.Object, key client.ObjectKey, blueprint metav1.Object) (runtime.Object, error) {
 	blueprintObject, ok := blueprint.(runtime.Object)
 	kind := blueprintObject.GetObjectKind().GroupVersionKind().Kind

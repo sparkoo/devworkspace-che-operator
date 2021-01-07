@@ -16,28 +16,42 @@ import (
 	"context"
 
 	"github.com/che-incubator/devworkspace-che-operator/apis/che-controller/v1alpha1"
-	"github.com/devfile/devworkspace-operator/pkg/config"
-	routeV1 "github.com/openshift/api/route/v1"
+	"github.com/che-incubator/devworkspace-che-operator/pkg/defaults"
+	"github.com/che-incubator/devworkspace-che-operator/pkg/infrastructure"
+	"github.com/che-incubator/devworkspace-che-operator/pkg/sync"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
+	routev1 "github.com/openshift/api/route/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
 	rbac "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/event"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
 var (
 	log = ctrl.Log.WithName("che")
+
+	routeDiffOpts = cmp.Options{
+		cmpopts.IgnoreFields(routev1.Route{}, "TypeMeta", "ObjectMeta", "Status"),
+		cmpopts.IgnoreFields(routev1.RouteSpec{}, "WildcardPolicy"),
+	}
+
+	ingressDiffOpts = cmp.Options{
+		cmpopts.IgnoreFields(v1beta1.Ingress{}, "TypeMeta", "ObjectMeta", "Status"),
+	}
 )
 
 type CheReconciler struct {
 	client  client.Client
 	scheme  *runtime.Scheme
 	gateway CheGateway
+	syncer  sync.Syncer
 }
 
 func (r *CheReconciler) SetupWithManager(mgr ctrl.Manager) error {
@@ -45,6 +59,7 @@ func (r *CheReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.scheme = mgr.GetScheme()
 	r.gateway.client = mgr.GetClient()
 	r.gateway.scheme = mgr.GetScheme()
+	r.syncer = sync.New(r.client, r.scheme)
 
 	bld := ctrl.NewControllerManagedBy(mgr).
 		For(&v1alpha1.CheManager{}).
@@ -56,23 +71,9 @@ func (r *CheReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&corev1.ServiceAccount{}).
 		Owns(&rbac.Role{}).
 		Owns(&rbac.RoleBinding{})
-	if config.ControllerCfg.IsOpenShift() {
-		bld.Owns(&routeV1.Route{})
+	if infrastructure.Current.Type == infrastructure.OpenShift {
+		bld.Owns(&routev1.Route{})
 	}
-	bld.WithEventFilter(predicate.Funcs{
-		CreateFunc: func(ev event.CreateEvent) bool {
-			return isChe(ev.Object)
-		},
-		DeleteFunc: func(ev event.DeleteEvent) bool {
-			return isChe(ev.Object)
-		},
-		UpdateFunc: func(ev event.UpdateEvent) bool {
-			return isChe(ev.ObjectNew)
-		},
-		GenericFunc: func(ev event.GenericEvent) bool {
-			return isChe(ev.Object)
-		},
-	})
 	return bld.Complete(r)
 }
 
@@ -95,17 +96,21 @@ func (r *CheReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		return ctrl.Result{}, r.finalize(current)
 	}
 
-	if current.Spec.Routing == v1alpha1.SingleHost {
-		if err = r.gateway.Sync(ctx, current); err != nil {
+	if err = r.reconcileGateway(ctx, current); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	if infrastructure.Current.Type == infrastructure.OpenShift {
+		if err = r.reconcileRoute(ctx, current); err != nil {
 			return ctrl.Result{}, err
 		}
 	} else {
-		if err = r.gateway.Delete(ctx, current); err != nil {
+		if err = r.reconcileIngress(ctx, current); err != nil {
 			return ctrl.Result{}, err
 		}
 	}
 
-	// TODO create ingress/route according to current.Host
+	// TODO update the status
 
 	return ctrl.Result{}, nil
 }
@@ -115,6 +120,100 @@ func (r *CheReconciler) finalize(router *v1alpha1.CheManager) error {
 	return nil
 }
 
-func isChe(obj runtime.Object) bool {
-	return obj.GetObjectKind().GroupVersionKind().Kind == "Che"
+func (r *CheReconciler) reconcileGateway(ctx context.Context, manager *v1alpha1.CheManager) error {
+	if manager.Spec.Routing == v1alpha1.SingleHost {
+		if err := r.gateway.Sync(ctx, manager); err != nil {
+			return err
+		}
+	} else if err := r.gateway.Delete(ctx, manager); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r *CheReconciler) reconcileRoute(ctx context.Context, manager *v1alpha1.CheManager) error {
+	route := getRouteSpec(manager)
+
+	if manager.Spec.Routing == v1alpha1.SingleHost {
+		if _, err := r.syncer.Sync(ctx, manager, route, routeDiffOpts); err != nil {
+			return err
+		}
+	} else {
+		r.syncer.Delete(ctx, route)
+	}
+	return nil
+}
+
+func (r *CheReconciler) reconcileIngress(ctx context.Context, manager *v1alpha1.CheManager) error {
+	ingress := getIngressSpec(manager)
+
+	if manager.Spec.Routing == v1alpha1.SingleHost {
+		if _, err := r.syncer.Sync(ctx, manager, ingress, ingressDiffOpts); err != nil {
+			return err
+		}
+	} else {
+		r.syncer.Delete(ctx, ingress)
+	}
+	return nil
+}
+
+func getRouteSpec(manager *v1alpha1.CheManager) *routev1.Route {
+	return &routev1.Route{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      manager.Name,
+			Namespace: manager.Namespace,
+			Labels:    defaults.GetLabelsForComponent(manager, "external-access"),
+		},
+		Spec: routev1.RouteSpec{
+			Host: manager.Spec.Host,
+			To: routev1.RouteTargetReference{
+				Kind: "Service",
+				Name: GetGatewayServiceName(manager),
+			},
+			Port: &routev1.RoutePort{
+				TargetPort: intstr.FromInt(GatewayPort),
+			},
+			TLS: &routev1.TLSConfig{
+				InsecureEdgeTerminationPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
+				Termination:                   routev1.TLSTerminationEdge,
+			},
+		},
+	}
+}
+
+func getIngressSpec(manager *v1alpha1.CheManager) *v1beta1.Ingress {
+	return &v1beta1.Ingress{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      manager.Name,
+			Namespace: manager.Namespace,
+			Labels:    defaults.GetLabelsForComponent(manager, "external-access"),
+			Annotations: map[string]string{
+				"kubernetes.io/ingress.class":                       "nginx",
+				"nginx.ingress.kubernetes.io/proxy-read-timeout":    "3600",
+				"nginx.ingress.kubernetes.io/proxy-connect-timeout": "3600",
+				// "nginx.ingress.kubernetes.io/ssl-redirect":          "true", - do we need this?
+			},
+		},
+		Spec: v1beta1.IngressSpec{
+			Rules: []v1beta1.IngressRule{
+				{
+					Host: manager.Spec.Host,
+					IngressRuleValue: v1beta1.IngressRuleValue{
+						HTTP: &v1beta1.HTTPIngressRuleValue{
+							Paths: []v1beta1.HTTPIngressPath{
+								{
+									Path: "/",
+									Backend: v1beta1.IngressBackend{
+										ServiceName: GetGatewayServiceName(manager),
+										ServicePort: intstr.FromInt(GatewayPort),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
 }
