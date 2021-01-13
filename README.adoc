@@ -26,3 +26,18 @@ This controller is in charge of exposing the workspace endpoints by reconciling 
 by the main devworkspace operator. For this controller to handle the endpoints of a workspace, the `DevWorkspace` object describing the workspace needs to have the `routingClass` property set to `che`.
 
 NOTE: At the moment, there is only a skeleton implementation that does nothing.
+
+== Build
+
+To build the code, just run:
+
+```
+make
+```
+
+There are more things you can do with `make`. To figure out what is available, run:
+
+```
+make help
+``` 
+
