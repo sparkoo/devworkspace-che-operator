@@ -58,6 +58,8 @@ github.com/devfile/api v0.0.0-20201125082321-aeda60d43619 h1:1pTtDONDby55+kqHhvS
 github.com/devfile/api v0.0.0-20201125082321-aeda60d43619/go.mod h1:/aDiwWjDEW/fY1/Ig8umVtmneAXKZImnLvWqzMlcfrY=
 github.com/devfile/devworkspace-operator v0.0.0-20201224151353-1b7df8fb9d7c h1:2xmvx7UYYS867qmKHalkMwn/p6vcIZZNOSNHNAlXNdw=
 github.com/devfile/devworkspace-operator v0.0.0-20201224151353-1b7df8fb9d7c/go.mod h1:5HB56/czS3Mi7n7q/9BIliWFqd8EFyAtAaYWNCuPXG8=
+github.com/devfile/devworkspace-operator v0.0.0-20210112190458-2b0293f9b270 h1:k7343tDSbTfqGBnOECtLwxJzlBPjrSIjRQjArdf8pGM=
+github.com/devfile/devworkspace-operator v0.0.0-20210112190458-2b0293f9b270/go.mod h1:5HB56/czS3Mi7n7q/9BIliWFqd8EFyAtAaYWNCuPXG8=
 github.com/dgrijalva/jwt-go v3.2.0+incompatible/go.mod h1:E3ru+11k8xSBh+hMPgOLZmtrrCbhqsmaPHjLKYnJCaQ=
 github.com/docker/docker v0.7.3-0.20190327010347-be7ac8be2ae0/go.mod h1:eEKB0N0r5NX/I1kEveEz05bcu8tLC/8azJZsviup8Sk=
 github.com/docker/go-units v0.3.3/go.mod h1:fgPhTUdO+D/Jk86RDLlptpiXQzgHJF7gydDDbaIK4Dk=

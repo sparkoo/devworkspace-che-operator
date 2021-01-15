@@ -3,7 +3,7 @@ module github.com/che-incubator/devworkspace-che-operator
 go 1.13
 
 require (
-	github.com/devfile/devworkspace-operator v0.0.0-20201224151353-1b7df8fb9d7c
+	github.com/devfile/devworkspace-operator v0.0.0-20210112190458-2b0293f9b270
 	github.com/golang/groupcache v0.0.0-20190702054246-869f871628b6 // indirect
 	github.com/google/go-cmp v0.5.0
 	github.com/openshift/api v0.0.0-20200205133042-34f0ec8dab87
