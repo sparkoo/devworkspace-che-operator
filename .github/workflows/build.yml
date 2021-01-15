@@ -65,6 +65,9 @@ jobs:
   docker:
     runs-on: ubuntu-18.04
     needs: go
+    # defaults:
+    #   run:
+    #     working-directory: .
     steps:
       -
         name: Checkout
@@ -110,6 +113,7 @@ jobs:
       -
         name: Docker Buildx (build)
         run: |
+          echo $(pwd)
           docker buildx build --output "type=image,push=false" ${{ steps.prepare.outputs.buildx_args }}
       -
         name: Docker Login
