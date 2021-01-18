@@ -65,9 +65,6 @@ jobs:
   docker:
     runs-on: ubuntu-18.04
     needs: go
-    # defaults:
-    #   run:
-    #     working-directory: .
     steps:
       -
         name: Checkout
