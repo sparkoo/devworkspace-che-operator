@@ -70,37 +70,37 @@ func (g *CheGateway) Sync(ctx context.Context, manager *v1alpha1.CheManager) (bo
 	var err error
 
 	sa := getGatewayServiceAccountSpec(manager)
-	if partial, err = syncer.Sync(ctx, manager, &sa, serviceAccountDiffOpts); err != nil {
+	if partial, _, err = syncer.Sync(ctx, manager, &sa, serviceAccountDiffOpts); err != nil {
 		return false, err
 	}
 	ret = ret || partial
 
 	role := getGatewayRoleSpec(manager)
-	if partial, err = syncer.Sync(ctx, manager, &role, roleDiffOpts); err != nil {
+	if partial, _, err = syncer.Sync(ctx, manager, &role, roleDiffOpts); err != nil {
 		return false, err
 	}
 	ret = ret || partial
 
 	roleBinding := getGatewayRoleBindingSpec(manager)
-	if partial, err = syncer.Sync(ctx, manager, &roleBinding, roleBindingDiffOpts); err != nil {
+	if partial, _, err = syncer.Sync(ctx, manager, &roleBinding, roleBindingDiffOpts); err != nil {
 		return false, err
 	}
 	ret = ret || partial
 
 	traefikConfig := getGatewayTraefikConfigSpec(manager)
-	if partial, err = syncer.Sync(ctx, manager, &traefikConfig, configMapDiffOpts); err != nil {
+	if partial, _, err = syncer.Sync(ctx, manager, &traefikConfig, configMapDiffOpts); err != nil {
 		return false, err
 	}
 	ret = ret || partial
 
 	depl := getGatewayDeploymentSpec(manager)
-	if partial, err = syncer.Sync(ctx, manager, &depl, deploymentDiffOpts); err != nil {
+	if partial, _, err = syncer.Sync(ctx, manager, &depl, deploymentDiffOpts); err != nil {
 		return false, err
 	}
 	ret = ret || partial
 
 	service := getGatewayServiceSpec(manager)
-	if partial, err = syncer.Sync(ctx, manager, &service, serviceDiffOpts); err != nil {
+	if partial, _, err = syncer.Sync(ctx, manager, &service, serviceDiffOpts); err != nil {
 		return false, err
 	}
 	ret = ret || partial
