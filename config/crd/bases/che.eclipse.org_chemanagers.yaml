@@ -64,6 +64,8 @@ spec:
             type: object
           status:
             properties:
+              gatewayHost:
+                type: string
               gatewayPhase:
                 type: string
             type: object

@@ -31,6 +31,7 @@ import (
 	"github.com/che-incubator/devworkspace-che-operator/pkg/manager"
 	"github.com/che-incubator/devworkspace-che-operator/pkg/solver"
 	routev1 "github.com/openshift/api/route/v1"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 )
 
 var (
@@ -39,15 +40,15 @@ var (
 )
 
 func init() {
-	v1alpha1.AddToScheme(scheme)
-	controllerv1alpha1.AddToScheme(scheme)
-	extensions.AddToScheme(scheme)
-	corev1.AddToScheme(scheme)
-	appsv1.AddToScheme(scheme)
-	rbac.AddToScheme(scheme)
+	utilruntime.Must(v1alpha1.AddToScheme(scheme))
+	utilruntime.Must(controllerv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(extensions.AddToScheme(scheme))
+	utilruntime.Must(corev1.AddToScheme(scheme))
+	utilruntime.Must(appsv1.AddToScheme(scheme))
+	utilruntime.Must(rbac.AddToScheme(scheme))
 
 	if infrastructure.Current.Type == infrastructure.OpenShift {
-		routev1.AddToScheme(scheme)
+		utilruntime.Must(routev1.AddToScheme(scheme))
 	}
 }
 

@@ -10,13 +10,14 @@
 //   Red Hat, Inc. - initial API and implementation
 //
 
-package manager
+package gateway
 
 import (
 	"context"
 
 	"github.com/che-incubator/devworkspace-che-operator/apis/che-controller/v1alpha1"
 	"github.com/che-incubator/devworkspace-che-operator/pkg/defaults"
+	"github.com/che-incubator/devworkspace-che-operator/pkg/infrastructure"
 	"github.com/che-incubator/devworkspace-che-operator/pkg/sync"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -62,7 +63,14 @@ type CheGateway struct {
 	scheme *runtime.Scheme
 }
 
-func (g *CheGateway) Sync(ctx context.Context, manager *v1alpha1.CheManager) (bool, error) {
+func New(client client.Client, scheme *runtime.Scheme) CheGateway {
+	return CheGateway{
+		client: client,
+		scheme: scheme,
+	}
+}
+
+func (g *CheGateway) Sync(ctx context.Context, manager *v1alpha1.CheManager) (bool, string, error) {
 
 	syncer := sync.New(g.client, g.scheme)
 
@@ -71,41 +79,55 @@ func (g *CheGateway) Sync(ctx context.Context, manager *v1alpha1.CheManager) (bo
 
 	sa := getGatewayServiceAccountSpec(manager)
 	if partial, _, err = syncer.Sync(ctx, manager, &sa, serviceAccountDiffOpts); err != nil {
-		return false, err
+		return false, "", err
 	}
 	ret = ret || partial
 
 	role := getGatewayRoleSpec(manager)
 	if partial, _, err = syncer.Sync(ctx, manager, &role, roleDiffOpts); err != nil {
-		return false, err
+		return false, "", err
 	}
 	ret = ret || partial
 
 	roleBinding := getGatewayRoleBindingSpec(manager)
 	if partial, _, err = syncer.Sync(ctx, manager, &roleBinding, roleBindingDiffOpts); err != nil {
-		return false, err
+		return false, "", err
 	}
 	ret = ret || partial
 
 	traefikConfig := getGatewayTraefikConfigSpec(manager)
 	if partial, _, err = syncer.Sync(ctx, manager, &traefikConfig, configMapDiffOpts); err != nil {
-		return false, err
+		return false, "", err
 	}
 	ret = ret || partial
 
 	depl := getGatewayDeploymentSpec(manager)
 	if partial, _, err = syncer.Sync(ctx, manager, &depl, deploymentDiffOpts); err != nil {
-		return false, err
+		return false, "", err
 	}
 	ret = ret || partial
 
 	service := getGatewayServiceSpec(manager)
 	if partial, _, err = syncer.Sync(ctx, manager, &service, serviceDiffOpts); err != nil {
-		return false, err
+		return false, "", err
 	}
 	ret = ret || partial
 
-	return ret, nil
+	var host string
+
+	if infrastructure.Current.Type == infrastructure.OpenShift {
+		if partial, host, err = g.reconcileRoute(syncer, ctx, manager); err != nil {
+			return false, "", err
+		}
+		ret = ret || partial
+	} else {
+		if partial, host, err = g.reconcileIngress(syncer, ctx, manager); err != nil {
+			return false, "", err
+		}
+		ret = ret || partial
+	}
+
+	return ret, host, nil
 }
 
 func GetGatewayServiceName(manager *v1alpha1.CheManager) string {

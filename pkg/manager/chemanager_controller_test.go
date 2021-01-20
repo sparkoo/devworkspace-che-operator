@@ -7,16 +7,30 @@ import (
 
 	"github.com/che-incubator/devworkspace-che-operator/apis/che-controller/v1alpha1"
 	"github.com/che-incubator/devworkspace-che-operator/pkg/defaults"
+	"github.com/che-incubator/devworkspace-che-operator/pkg/gateway"
 	"github.com/che-incubator/devworkspace-che-operator/pkg/sync"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	extensions "k8s.io/api/extensions/v1beta1"
 	rbac "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
+
+func createTestScheme() *runtime.Scheme {
+	scheme := runtime.NewScheme()
+	utilruntime.Must(v1alpha1.AddToScheme(scheme))
+	utilruntime.Must(extensions.AddToScheme(scheme))
+	utilruntime.Must(corev1.AddToScheme(scheme))
+	utilruntime.Must(appsv1.AddToScheme(scheme))
+	utilruntime.Must(rbac.AddToScheme(scheme))
+	return scheme
+}
 
 func TestCreatesObjectsInSingleHost(t *testing.T) {
 	managerName := "che"
@@ -34,14 +48,14 @@ func TestCreatesObjectsInSingleHost(t *testing.T) {
 		},
 	})
 
-	reconciler := CheReconciler{client: cl, scheme: scheme, gateway: CheGateway{client: cl, scheme: scheme}, syncer: sync.New(cl, scheme)}
+	reconciler := CheReconciler{client: cl, scheme: scheme, gateway: gateway.New(cl, scheme), syncer: sync.New(cl, scheme)}
 
 	_, err := reconciler.Reconcile(reconcile.Request{NamespacedName: types.NamespacedName{Name: managerName, Namespace: ns}})
 	if err != nil {
 		t.Fatalf("Failed to reconcile che manager with error: %s", err)
 	}
 
-	testGatewayObjectsExist(t, ctx, cl, managerName, ns)
+	gateway.TestGatewayObjectsExist(t, ctx, cl, managerName, ns)
 }
 
 func TestUpdatesObjectsInSingleHost(t *testing.T) {
@@ -104,14 +118,14 @@ func TestUpdatesObjectsInSingleHost(t *testing.T) {
 
 	ctx := context.TODO()
 
-	reconciler := CheReconciler{client: cl, scheme: scheme, gateway: CheGateway{client: cl, scheme: scheme}, syncer: sync.New(cl, scheme)}
+	reconciler := CheReconciler{client: cl, scheme: scheme, gateway: gateway.New(cl, scheme), syncer: sync.New(cl, scheme)}
 
 	_, err := reconciler.Reconcile(reconcile.Request{NamespacedName: types.NamespacedName{Name: managerName, Namespace: ns}})
 	if err != nil {
 		t.Fatalf("Failed to reconcile che manager with error: %s", err)
 	}
 
-	testGatewayObjectsExist(t, ctx, cl, managerName, ns)
+	gateway.TestGatewayObjectsExist(t, ctx, cl, managerName, ns)
 
 	depl := &appsv1.Deployment{}
 	if err = cl.Get(ctx, client.ObjectKey{Name: managerName, Namespace: ns}, depl); err != nil {
@@ -143,14 +157,14 @@ func TestDoesntCreateObjectsInMultiHost(t *testing.T) {
 		},
 	})
 
-	reconciler := CheReconciler{client: cl, scheme: scheme, gateway: CheGateway{client: cl, scheme: scheme}, syncer: sync.New(cl, scheme)}
+	reconciler := CheReconciler{client: cl, scheme: scheme, gateway: gateway.New(cl, scheme), syncer: sync.New(cl, scheme)}
 
 	_, err := reconciler.Reconcile(reconcile.Request{NamespacedName: types.NamespacedName{Name: managerName, Namespace: ns}})
 	if err != nil {
 		t.Fatalf("Failed to reconcile che manager with error: %s", err)
 	}
 
-	testGatewayObjectsDontExist(t, ctx, cl, managerName, ns)
+	gateway.TestGatewayObjectsDontExist(t, ctx, cl, managerName, ns)
 }
 
 func TestDeletesObjectsInMultiHost(t *testing.T) {
@@ -209,12 +223,12 @@ func TestDeletesObjectsInMultiHost(t *testing.T) {
 
 	ctx := context.TODO()
 
-	reconciler := CheReconciler{client: cl, scheme: scheme, gateway: CheGateway{client: cl, scheme: scheme}, syncer: sync.New(cl, scheme)}
+	reconciler := CheReconciler{client: cl, scheme: scheme, gateway: gateway.New(cl, scheme), syncer: sync.New(cl, scheme)}
 
 	_, err := reconciler.Reconcile(reconcile.Request{NamespacedName: types.NamespacedName{Name: managerName, Namespace: ns}})
 	if err != nil {
 		t.Fatalf("Failed to reconcile che manager with error: %s", err)
 	}
 
-	testGatewayObjectsDontExist(t, ctx, cl, managerName, ns)
+	gateway.TestGatewayObjectsDontExist(t, ctx, cl, managerName, ns)
 }

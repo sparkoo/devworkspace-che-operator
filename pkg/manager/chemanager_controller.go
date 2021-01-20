@@ -16,6 +16,7 @@ import (
 	"context"
 
 	"github.com/che-incubator/devworkspace-che-operator/apis/che-controller/v1alpha1"
+	"github.com/che-incubator/devworkspace-che-operator/pkg/gateway"
 	"github.com/che-incubator/devworkspace-che-operator/pkg/infrastructure"
 	"github.com/che-incubator/devworkspace-che-operator/pkg/sync"
 	routev1 "github.com/openshift/api/route/v1"
@@ -36,15 +37,14 @@ var (
 type CheReconciler struct {
 	client  client.Client
 	scheme  *runtime.Scheme
-	gateway CheGateway
+	gateway gateway.CheGateway
 	syncer  sync.Syncer
 }
 
 func (r *CheReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.client = mgr.GetClient()
 	r.scheme = mgr.GetScheme()
-	r.gateway.client = mgr.GetClient()
-	r.gateway.scheme = mgr.GetScheme()
+	r.gateway = gateway.New(mgr.GetClient(), mgr.GetScheme())
 	r.syncer = sync.New(r.client, r.scheme)
 
 	bld := ctrl.NewControllerManagedBy(mgr).
@@ -82,30 +82,19 @@ func (r *CheReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		return ctrl.Result{}, r.finalize(current)
 	}
 
-	var anyChanged, changed bool
+	var changed bool
+	var host string
 
-	if changed, err = r.reconcileGateway(ctx, current); err != nil {
+	if changed, host, err = r.reconcileGateway(ctx, current); err != nil {
 		return ctrl.Result{}, err
 	}
-	anyChanged = anyChanged || changed
 
-	if infrastructure.Current.Type == infrastructure.OpenShift {
-		if changed, err = r.reconcileRoute(ctx, current); err != nil {
-			return ctrl.Result{}, err
-		}
-		anyChanged = anyChanged || changed
-	} else {
-		if changed, err = r.reconcileIngress(ctx, current); err != nil {
-			return ctrl.Result{}, err
-		}
-		anyChanged = anyChanged || changed
-	}
-
-	return r.updateStatus(ctx, current, anyChanged)
+	return r.updateStatus(ctx, current, changed, host)
 }
 
-func (r *CheReconciler) updateStatus(ctx context.Context, manager *v1alpha1.CheManager, changed bool) (ctrl.Result, error) {
+func (r *CheReconciler) updateStatus(ctx context.Context, manager *v1alpha1.CheManager, changed bool, host string) (ctrl.Result, error) {
 	currentPhase := manager.Status.GatewayPhase
+	currentHost := manager.Status.GatewayHost
 
 	if manager.Spec.Routing == v1alpha1.MultiHost {
 		manager.Status.GatewayPhase = v1alpha1.GatewayPhaseInactive
@@ -115,7 +104,9 @@ func (r *CheReconciler) updateStatus(ctx context.Context, manager *v1alpha1.CheM
 		manager.Status.GatewayPhase = v1alpha1.GatewayPhaseEstablished
 	}
 
-	if currentPhase != manager.Status.GatewayPhase {
+	manager.Status.GatewayHost = host
+
+	if currentPhase != manager.Status.GatewayPhase || currentHost != manager.Status.GatewayHost {
 		return ctrl.Result{Requeue: true}, r.client.Status().Update(ctx, manager)
 	}
 
@@ -127,15 +118,16 @@ func (r *CheReconciler) finalize(router *v1alpha1.CheManager) error {
 	return nil
 }
 
-func (r *CheReconciler) reconcileGateway(ctx context.Context, manager *v1alpha1.CheManager) (bool, error) {
+func (r *CheReconciler) reconcileGateway(ctx context.Context, manager *v1alpha1.CheManager) (bool, string, error) {
 	var changed bool
 	var err error
+	var host string
 
 	if manager.Spec.Routing == v1alpha1.SingleHost {
-		changed, err = r.gateway.Sync(ctx, manager)
+		changed, host, err = r.gateway.Sync(ctx, manager)
 	} else {
-		changed, err = true, r.gateway.Delete(ctx, manager)
+		changed, host, err = true, "", r.gateway.Delete(ctx, manager)
 	}
 
-	return changed, err
+	return changed, host, err
 }
