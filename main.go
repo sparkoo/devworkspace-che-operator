@@ -30,6 +30,7 @@ import (
 	"github.com/che-incubator/devworkspace-che-operator/pkg/infrastructure"
 	"github.com/che-incubator/devworkspace-che-operator/pkg/manager"
 	"github.com/che-incubator/devworkspace-che-operator/pkg/solver"
+	routev1 "github.com/openshift/api/route/v1"
 )
 
 var (
@@ -44,6 +45,10 @@ func init() {
 	corev1.AddToScheme(scheme)
 	appsv1.AddToScheme(scheme)
 	rbac.AddToScheme(scheme)
+
+	if infrastructure.Current.Type == infrastructure.OpenShift {
+		routev1.AddToScheme(scheme)
+	}
 }
 
 func main() {
