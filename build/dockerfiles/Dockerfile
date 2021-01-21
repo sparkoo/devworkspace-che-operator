@@ -20,7 +20,6 @@ COPY . .
 
 # Build
 RUN export ARCH="$(uname -m)" && if [[ ${ARCH} == "x86_64" ]]; then export ARCH="amd64"; elif [[ ${ARCH} == "aarch64" ]]; then export ARCH="arm64"; fi && \
-    export MOCK_API=true && \
     GOOS=linux GOARCH=${ARCH} CGO_ENABLED=0 GO111MODULE=on go build \
   -a -o _output/bin/devworkspace-che-operator \
   -gcflags all=-trimpath=/ \
