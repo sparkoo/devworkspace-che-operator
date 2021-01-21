@@ -41,10 +41,10 @@ func New(client client.Client, scheme *runtime.Scheme) Syncer {
 
 // Sync syncs the blueprint to the cluster in a generic (as much as Go allows) manner.
 // Returns true if the object was created or updated, false if there was no change detected.
-func (s *Syncer) Sync(ctx context.Context, owner metav1.Object, blueprint metav1.Object, diffOpts cmp.Option) (bool, error) {
+func (s *Syncer) Sync(ctx context.Context, owner metav1.Object, blueprint metav1.Object, diffOpts cmp.Option) (bool, runtime.Object, error) {
 	blueprintObject, ok := blueprint.(runtime.Object)
 	if !ok {
-		return false, fmt.Errorf("object %T is not a runtime.Object. Cannot sync it", blueprint)
+		return false, nil, fmt.Errorf("object %T is not a runtime.Object. Cannot sync it", blueprint)
 	}
 
 	key := client.ObjectKey{Name: blueprint.GetName(), Namespace: blueprint.GetNamespace()}
@@ -53,18 +53,18 @@ func (s *Syncer) Sync(ctx context.Context, owner metav1.Object, blueprint metav1
 
 	if getErr := s.client.Get(context.TODO(), key, actual); getErr != nil {
 		if statusErr, ok := getErr.(*errors.StatusError); !ok || statusErr.Status().Reason != metav1.StatusReasonNotFound {
-			return false, getErr
+			return false, nil, getErr
 		}
 		actual = nil
 	}
 
 	if actual == nil {
-		_, err := s.create(ctx, owner, key, blueprint)
+		actual, err := s.create(ctx, owner, key, blueprint)
 		if err != nil {
-			return false, err
+			return false, actual, err
 		}
 
-		return true, nil
+		return true, actual, nil
 	}
 
 	return s.update(ctx, owner, actual, blueprint, diffOpts)
@@ -115,15 +115,15 @@ func (s *Syncer) create(ctx context.Context, owner metav1.Object, key client.Obj
 		// ok, we got an already-exists error. So let's try to load the object into "actual".
 		// if we fail this retry for whatever reason, just give up rather than retrying this in a loop...
 		// the reconciliation loop will lead us here again in the next round.
-		if getErr := s.client.Get(ctx, key, actual); getErr != nil {
-			return nil, getErr
+		if err = s.client.Get(ctx, key, actual); err != nil {
+			return nil, err
 		}
 	}
 
 	return actual, nil
 }
 
-func (s *Syncer) update(ctx context.Context, owner metav1.Object, actual runtime.Object, blueprint metav1.Object, diffOpts cmp.Option) (bool, error) {
+func (s *Syncer) update(ctx context.Context, owner metav1.Object, actual runtime.Object, blueprint metav1.Object, diffOpts cmp.Option) (bool, runtime.Object, error) {
 	actualMeta := actual.(metav1.Object)
 
 	diff := cmp.Diff(actual, blueprint, diffOpts)
@@ -157,22 +157,16 @@ func (s *Syncer) update(ctx context.Context, owner metav1.Object, actual runtime
 		if isUpdateUsingDeleteCreate(actual.GetObjectKind().GroupVersionKind().Kind) {
 			err := s.client.Delete(ctx, actual)
 			if err != nil {
-				return false, err
+				return false, actual, err
 			}
 
-			obj, err := s.setOwnerReferenceAndConvertToRuntime(owner, blueprint)
-			if err != nil {
-				return false, err
-			}
-
-			err = s.client.Create(ctx, obj)
-			if err != nil {
-				return false, err
-			}
+			key := client.ObjectKey{Name: actualMeta.GetName(), Namespace: actualMeta.GetNamespace()}
+			obj, err := s.create(ctx, owner, key, blueprint)
+			return false, obj, err
 		} else {
 			obj, err := s.setOwnerReferenceAndConvertToRuntime(owner, blueprint)
 			if err != nil {
-				return false, err
+				return false, actual, err
 			}
 
 			// to be able to update, we need to set the resource version of the object that we know of
@@ -180,19 +174,19 @@ func (s *Syncer) update(ctx context.Context, owner metav1.Object, actual runtime
 
 			err = s.client.Update(ctx, obj)
 			if err != nil {
-				return false, err
+				return false, obj, err
 			}
-		}
 
-		return true, nil
+			return true, obj, nil
+		}
 	}
-	return false, nil
+	return false, actual, nil
 }
 
 func isUpdateUsingDeleteCreate(kind string) bool {
-	// not sure why the old che operator needed this, but keeping the original code around just in case we find the reason :)
-	// return "Service" == kind || "Ingress" == kind || "Route" == kind
-	return false
+	// Routes are not able to update the host, so we just need to re-create them...
+	// ingresses and services have been identified to needs this, too, for reasons that I don't know..
+	return "Service" == kind || "Ingress" == kind || "Route" == kind
 }
 
 func (s *Syncer) setOwnerReferenceAndConvertToRuntime(owner metav1.Object, obj metav1.Object) (runtime.Object, error) {
