@@ -58,6 +58,7 @@ const (
 // +k8s:openapi-gen=true
 type CheManagerStatus struct {
 	GatewayPhase GatewayPhase `json:"gatewayPhase,omitempty"`
+	GatewayHost  string       `json:"gatewayHost,omitempty"`
 }
 
 // CheManager is the configuration of the CheManager layer of Devworkspace.
