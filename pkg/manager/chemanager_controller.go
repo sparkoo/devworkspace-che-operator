@@ -14,11 +14,12 @@ package manager
 
 import (
 	"context"
+	"sync"
 
 	"github.com/che-incubator/devworkspace-che-operator/apis/che-controller/v1alpha1"
 	"github.com/che-incubator/devworkspace-che-operator/pkg/gateway"
 	"github.com/che-incubator/devworkspace-che-operator/pkg/infrastructure"
-	"github.com/che-incubator/devworkspace-che-operator/pkg/sync"
+	datasync "github.com/che-incubator/devworkspace-che-operator/pkg/sync"
 	routev1 "github.com/openshift/api/route/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -31,21 +32,36 @@ import (
 )
 
 var (
-	log = ctrl.Log.WithName("che")
+	log             = ctrl.Log.WithName("che")
+	currentManagers = map[client.ObjectKey]v1alpha1.CheManager{}
+	managerAccess   = sync.Mutex{}
 )
 
 type CheReconciler struct {
 	client  client.Client
 	scheme  *runtime.Scheme
 	gateway gateway.CheGateway
-	syncer  sync.Syncer
+	syncer  datasync.Syncer
+}
+
+func GetCurrentManagers() map[client.ObjectKey]v1alpha1.CheManager {
+	managerAccess.Lock()
+	defer managerAccess.Unlock()
+
+	ret := map[client.ObjectKey]v1alpha1.CheManager{}
+
+	for k, v := range currentManagers {
+		ret[k] = v
+	}
+
+	return ret
 }
 
 func (r *CheReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.client = mgr.GetClient()
 	r.scheme = mgr.GetScheme()
 	r.gateway = gateway.New(mgr.GetClient(), mgr.GetScheme())
-	r.syncer = sync.New(r.client, r.scheme)
+	r.syncer = datasync.New(r.client, r.scheme)
 
 	bld := ctrl.NewControllerManagedBy(mgr).
 		For(&v1alpha1.CheManager{}).
@@ -89,7 +105,17 @@ func (r *CheReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		return ctrl.Result{}, err
 	}
 
-	return r.updateStatus(ctx, current, changed, host)
+	res, err := r.updateStatus(ctx, current, changed, host)
+
+	if err == nil {
+		// update the shared map
+		managerAccess.Lock()
+		defer managerAccess.Unlock()
+
+		currentManagers[req.NamespacedName] = *current
+	}
+
+	return res, err
 }
 
 func (r *CheReconciler) updateStatus(ctx context.Context, manager *v1alpha1.CheManager, changed bool, host string) (ctrl.Result, error) {
