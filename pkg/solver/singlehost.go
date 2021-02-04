@@ -33,9 +33,10 @@ import (
 )
 
 const (
-	uniqueEndpointAttributeName    = "unique"
-	endpointURLPrefixPattern       = "/workspaces/%s/endpoints/%s/%d"
-	uniqueEndpointURLPrefixPattern = endpointURLPrefixPattern + "-%s"
+	uniqueEndpointAttributeName = "unique"
+	endpointURLPrefixPattern    = "/%s/%s/%d"
+	// note - che-theia DEPENDS on this format - we should not change this unless crosschecked with the che-theia impl
+	uniqueEndpointURLPrefixPattern = "/%s/%s/%s"
 )
 
 var (
@@ -118,8 +119,29 @@ func (c *CheRoutingSolver) singlehostExposedEndpoints(manager *dwoche.CheManager
 			if endpoint.Exposure != dw.PublicEndpointExposure {
 				continue
 			}
+
+			var scheme string
+			if endpoint.Protocol == "" {
+				scheme = "http"
+			} else {
+				scheme = string(endpoint.Protocol)
+			}
+
+			if scheme != "http" && scheme != "https" {
+				// we cannot expose non-http endpoints publicly, because ingresses/routes only support http(s)
+				continue
+			}
+
+			if endpoint.Secure {
+				scheme = "https"
+
+				// TODO this should also do the magic of ensuring user authentication however we are going to do it
+				// in the future
+			}
+
 			publicURLPrefix := getPublicURLPrefixForEndpoint(workspaceID, machineName, endpoint)
-			publicURL := "https://" + ensureDoesntEndWithSlash(host) + ensureDoesntEndWithSlash(publicURLPrefix) + ensureStartsWithSlash(endpoint.Path)
+
+			publicURL := scheme + "://" + ensureDoesntEndWithSlash(host) + ensureDoesntEndWithSlash(publicURLPrefix) + ensureStartsWithSlash(endpoint.Path)
 
 			attrs := map[string]string{}
 			err := endpoint.Attributes.Into(&attrs)
@@ -281,7 +303,7 @@ func getPublicURLPrefix(workspaceID string, machineName string, port int32, uniq
 	if uniqueEndpointName == "" {
 		return fmt.Sprintf(endpointURLPrefixPattern, workspaceID, machineName, port)
 	}
-	return fmt.Sprintf(uniqueEndpointURLPrefixPattern, workspaceID, machineName, port, uniqueEndpointName)
+	return fmt.Sprintf(uniqueEndpointURLPrefixPattern, workspaceID, machineName, uniqueEndpointName)
 }
 
 func ensureEndsWithSlash(str string) string {
