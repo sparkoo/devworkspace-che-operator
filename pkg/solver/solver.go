@@ -187,7 +187,7 @@ func findCheManager(cheManagerKey client.ObjectKey) (*v1alpha1.CheManager, error
 	managers := manager.GetCurrentManagers()
 	if len(managers) == 0 {
 		// the CheManager has not been reconciled yet, so let's wait a bit
-		return &v1alpha1.CheManager{}, &solvers.RoutingNotReady{}
+		return &v1alpha1.CheManager{}, &solvers.RoutingNotReady{Retry: 1 * time.Second}
 	}
 
 	if len(cheManagerKey.Name) == 0 {
