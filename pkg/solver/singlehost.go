@@ -15,7 +15,7 @@ package solver
 import (
 	"context"
 	"fmt"
-	"strings"
+	"path"
 
 	dwoche "github.com/che-incubator/devworkspace-che-operator/apis/che-controller/v1alpha1"
 	"github.com/che-incubator/devworkspace-che-operator/pkg/defaults"
@@ -145,7 +145,7 @@ func (c *CheRoutingSolver) singlehostExposedEndpoints(manager *dwoche.CheManager
 
 			publicURLPrefix := getPublicURLPrefixForEndpoint(workspaceID, machineName, endpoint)
 
-			publicURL := scheme + "://" + ensureDoesntEndWithSlash(host) + ensureDoesntEndWithSlash(publicURLPrefix) + ensureStartsWithSlash(endpoint.Path)
+			publicURL := scheme + "://" + path.Join(host, publicURLPrefix, endpoint.Path)
 
 			attrs := map[string]string{}
 			err := endpoint.Attributes.Into(&attrs)
@@ -318,22 +318,4 @@ func getPublicURLPrefix(workspaceID string, machineName string, port int32, uniq
 		return fmt.Sprintf(endpointURLPrefixPattern, workspaceID, machineName, port)
 	}
 	return fmt.Sprintf(uniqueEndpointURLPrefixPattern, workspaceID, machineName, uniqueEndpointName)
-}
-
-func ensureEndsWithSlash(str string) string {
-	if strings.HasSuffix(str, "/") {
-		return str
-	}
-	return str + "/"
-}
-
-func ensureStartsWithSlash(str string) string {
-	if strings.HasPrefix(str, "/") {
-		return str
-	}
-	return "/" + str
-}
-
-func ensureDoesntEndWithSlash(str string) string {
-	return strings.TrimSuffix(str, "/")
 }
