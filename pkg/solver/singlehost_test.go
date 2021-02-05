@@ -1,0 +1,223 @@
+package solver
+
+import (
+	"context"
+	"fmt"
+	"testing"
+
+	"github.com/che-incubator/devworkspace-che-operator/apis/che-controller/v1alpha1"
+	"github.com/che-incubator/devworkspace-che-operator/pkg/defaults"
+	"github.com/che-incubator/devworkspace-che-operator/pkg/manager"
+	dw "github.com/devfile/api/pkg/apis/workspaces/v1alpha2"
+	dwo "github.com/devfile/devworkspace-operator/apis/controller/v1alpha1"
+	"github.com/devfile/devworkspace-operator/controllers/controller/workspacerouting/solvers"
+	"github.com/devfile/devworkspace-operator/pkg/config"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	extensions "k8s.io/api/extensions/v1beta1"
+	rbac "k8s.io/api/rbac/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/yaml"
+)
+
+func createTestScheme() *runtime.Scheme {
+	scheme := runtime.NewScheme()
+	utilruntime.Must(v1alpha1.AddToScheme(scheme))
+	utilruntime.Must(extensions.AddToScheme(scheme))
+	utilruntime.Must(corev1.AddToScheme(scheme))
+	utilruntime.Must(appsv1.AddToScheme(scheme))
+	utilruntime.Must(rbac.AddToScheme(scheme))
+	utilruntime.Must(dw.AddToScheme(scheme))
+	utilruntime.Must(dwo.AddToScheme(scheme))
+	return scheme
+}
+
+func getSpecObjects(t *testing.T, routing *dwo.WorkspaceRouting) (client.Client, solvers.RoutingSolver, solvers.RoutingObjects) {
+	scheme := createTestScheme()
+	cheManager := &v1alpha1.CheManager{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "che",
+			Namespace: "ns",
+		},
+		Spec: v1alpha1.CheManagerSpec{
+			Host:    "over.the.rainbow",
+			Routing: v1alpha1.SingleHost,
+		},
+	}
+
+	cl := fake.NewFakeClientWithScheme(scheme, cheManager)
+
+	solver, err := Getter(scheme).GetSolver(cl, "che")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	meta := solvers.WorkspaceMetadata{
+		WorkspaceId:   routing.Spec.WorkspaceId,
+		Namespace:     routing.GetNamespace(),
+		PodSelector:   routing.Spec.PodSelector,
+		RoutingSuffix: routing.Spec.RoutingSuffix,
+	}
+
+	// we need to do 1 round of che manager reconciliation so that the solver gets initialized
+	cheRecon := manager.New(cl, scheme)
+	cheRecon.Reconcile(reconcile.Request{NamespacedName: types.NamespacedName{Name: "che", Namespace: "ns"}})
+
+	objs, err := solver.GetSpecObjects(routing, meta)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return cl, solver, objs
+}
+
+func simpleWorkspaceRouting() *dwo.WorkspaceRouting {
+	return &dwo.WorkspaceRouting{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "routing",
+			Namespace: "ws",
+		},
+		Spec: dwo.WorkspaceRoutingSpec{
+			WorkspaceId:  "wsid",
+			RoutingClass: "che",
+			Endpoints: map[string]dwo.EndpointList{
+				"m1": {
+					{
+						Name:       "e1",
+						TargetPort: 9999,
+						Exposure:   dw.PublicEndpointExposure,
+						Protocol:   "https",
+						Path:       "/1",
+					},
+					{
+						Name:       "e2",
+						TargetPort: 9999,
+						Exposure:   dw.PublicEndpointExposure,
+						Protocol:   "http",
+						Path:       "/2",
+						Secure:     true,
+					},
+				},
+			},
+		},
+	}
+}
+
+func TestCreateObjects(t *testing.T) {
+	cl, _, objs := getSpecObjects(t, simpleWorkspaceRouting())
+
+	t.Run("noIngresses", func(t *testing.T) {
+		if len(objs.Ingresses) != 0 {
+			t.Error()
+		}
+	})
+
+	t.Run("noRoutes", func(t *testing.T) {
+		if len(objs.Routes) != 0 {
+			t.Error()
+		}
+	})
+
+	t.Run("noPodAdditions", func(t *testing.T) {
+		if objs.PodAdditions != nil {
+			t.Error()
+		}
+	})
+
+	for i := range objs.Services {
+		t.Run(fmt.Sprintf("service-%d", i), func(t *testing.T) {
+			svc := &objs.Services[i]
+			if svc.Annotations[defaults.ConfigAnnotationCheManagerName] != "che" {
+				t.Errorf("The name of the associated che manager should have been recorded in the service annotation")
+			}
+
+			if svc.Annotations[defaults.ConfigAnnotationCheManagerNamespace] != "ns" {
+				t.Errorf("The namespace of the associated che manager should have been recorded in the service annotation")
+			}
+
+			if svc.Labels[config.WorkspaceIDLabel] != "wsid" {
+				t.Errorf("The workspace ID should be recorded in the service labels")
+			}
+		})
+	}
+
+	t.Run("traefikConfig", func(t *testing.T) {
+		cms := &corev1.ConfigMapList{}
+		cl.List(context.TODO(), cms)
+
+		if len(cms.Items) != 2 {
+			t.Errorf("there should be 2 configmaps created for the gateway config of the workspace and che but there were: %d", len(cms.Items))
+		}
+
+		var cheMgrCfg *corev1.ConfigMap
+		var workspaceCfg *corev1.ConfigMap
+
+		for _, cfg := range cms.Items {
+			if cfg.Name == "che" {
+				cheMgrCfg = &cfg
+			}
+
+			if cfg.Name == "wsid" {
+				workspaceCfg = &cfg
+			}
+		}
+
+		if cheMgrCfg == nil {
+			t.Error("traefik configuration for che manager not found")
+		}
+
+		if workspaceCfg == nil {
+			t.Fatalf("traefik configuration for the workspace not found")
+		}
+
+		traefikWorkspaceConfig := workspaceCfg.Data["wsid.yml"]
+
+		if len(traefikWorkspaceConfig) == 0 {
+			t.Fatal("No traefik config file found in the workspace config configmap")
+		}
+
+		workspaceConfig := traefikConfig{}
+		if err := yaml.Unmarshal([]byte(traefikWorkspaceConfig), &workspaceConfig); err != nil {
+			t.Fatal(err)
+		}
+
+		if len(workspaceConfig.HTTP.Routers) != 1 {
+			t.Fatalf("Expected exactly one traefik router but got %d", len(workspaceConfig.HTTP.Routers))
+		}
+
+		if _, ok := workspaceConfig.HTTP.Routers["wsid-m1-9999"]; !ok {
+			t.Fatal("traefik config doesn't contain expected workspace configuration")
+		}
+	})
+}
+
+func TestFinalize(t *testing.T) {
+	routing := simpleWorkspaceRouting()
+	cl, slv, _ := getSpecObjects(t, routing)
+
+	// the create test checks that during the above call, the solver created the 2 traefik configmaps
+	// (1 for the main config and the second for the workspace)
+
+	// now, let the solver finalize the routing
+	if err := slv.Finalize(routing); err != nil {
+		t.Fatal(err)
+	}
+
+	cms := &corev1.ConfigMapList{}
+	cl.List(context.TODO(), cms)
+
+	if len(cms.Items) != 1 {
+		t.Fatalf("There should be just 1 configmap after routing finalization, but there were %d found", len(cms.Items))
+	}
+
+	cm := cms.Items[0]
+	if cm.Name != "che" {
+		t.Fatal("The only configmap left should be the main traefik config, but the configmap has unexpected name")
+	}
+}

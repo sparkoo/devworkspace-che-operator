@@ -57,6 +57,17 @@ func GetCurrentManagers() map[client.ObjectKey]v1alpha1.CheManager {
 	return ret
 }
 
+// New returns a new instance of the Che manager reconciler. This is mainly useful for
+// testing because it doesn't set up any watches in the cluster, etc. For that use SetupWithManager.
+func New(cl client.Client, scheme *runtime.Scheme) CheReconciler {
+	return CheReconciler{
+		client:  cl,
+		scheme:  scheme,
+		gateway: gateway.New(cl, scheme),
+		syncer:  datasync.New(cl, scheme),
+	}
+}
+
 func (r *CheReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.client = mgr.GetClient()
 	r.scheme = mgr.GetScheme()
