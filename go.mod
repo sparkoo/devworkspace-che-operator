@@ -11,6 +11,7 @@ require (
 	k8s.io/apimachinery v0.18.8
 	k8s.io/client-go v0.18.8
 	sigs.k8s.io/controller-runtime v0.6.3
+	sigs.k8s.io/yaml v1.2.0
 )
 
 replace github.com/devfile/devworkspace-operator => github.com/metlos/devworkspace-operator v0.0.0-20210203210500-d41bfe6bcb51

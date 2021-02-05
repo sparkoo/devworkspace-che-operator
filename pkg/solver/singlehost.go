@@ -30,6 +30,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/yaml"
 )
 
 const (
@@ -87,7 +88,10 @@ func (c *CheRoutingSolver) singlehostSpecObjects(cheManager *dwoche.CheManager, 
 	}
 
 	// k, now we have to create our own objects for configuring the gateway
-	configMaps := c.getGatewayConfigMaps(cheManager, workspaceMeta.WorkspaceId, routing)
+	configMaps, err := c.getGatewayConfigMaps(cheManager, workspaceMeta.WorkspaceId, routing)
+	if err != nil {
+		return solvers.RoutingObjects{}, err
+	}
 
 	syncer := sync.New(c.client, c.scheme)
 
@@ -161,7 +165,7 @@ func (c *CheRoutingSolver) singlehostExposedEndpoints(manager *dwoche.CheManager
 	return exposed, true, nil
 }
 
-func (c *CheRoutingSolver) getGatewayConfigMaps(cheManager *dwoche.CheManager, workspaceID string, routing *dwo.WorkspaceRouting) []corev1.ConfigMap {
+func (c *CheRoutingSolver) getGatewayConfigMaps(cheManager *dwoche.CheManager, workspaceID string, routing *dwo.WorkspaceRouting) ([]corev1.ConfigMap, error) {
 	restrictedAnno, setRestrictedAnno := routing.Annotations[config.WorkspaceRestrictedAccessAnnotation]
 
 	labels := defaults.GetLabelsForComponent(cheManager, "gateway-config")
@@ -183,9 +187,9 @@ func (c *CheRoutingSolver) getGatewayConfigMaps(cheManager *dwoche.CheManager, w
 		Data: map[string]string{},
 	}
 
-	routers := ""
-	services := ""
-	middlewares := ""
+	rtrs := map[string]traefikConfigRouter{}
+	srvcs := map[string]traefikConfigService{}
+	mdls := map[string]traefikConfigMiddleware{}
 
 	for machineName, endpoints := range routing.Spec.Endpoints {
 		// we need to support unique endpoints - so 1 port can actually be accessible
@@ -221,39 +225,49 @@ func (c *CheRoutingSolver) getGatewayConfigMaps(cheManager *dwoche.CheManager, w
 				prefix = getPublicURLPrefix(workspaceID, machineName, port, endpointName)
 				serviceURL = getServiceURL(port, workspaceID, routing.Namespace)
 
-				// watch out for formatting - YAML must be space-idented, tabs break it. Yet go is formatted using
-				// tabs.
-				routers = routers + `
-    ` + name + `:
-      rule: PathPrefix(` + "`" + prefix + "`" + `)
-      service: "` + name + `"
-      middlewares:
-      - "` + name + `"
-      priority: 100`
-				services = services + `
-    ` + name + `:
-      loadBalancer:
-        servers:
-        - url: "` + serviceURL + `"`
+				rtrs[name] = traefikConfigRouter{
+					Rule:        fmt.Sprintf("PathPrefix(`%s`)", prefix),
+					Service:     name,
+					Middlewares: []string{name},
+					Priority:    100,
+				}
 
-				middlewares = middlewares + `
-    ` + name + `:
-      stripPrefix:
-        prefixes:
-        - "` + prefix + `"`
+				srvcs[name] = traefikConfigService{
+					LoadBalancer: traefikConfigLoadbalancer{
+						Servers: []traefikConfigLoadbalancerServer{
+							{
+								URL: serviceURL,
+							},
+						},
+					},
+				}
+
+				mdls[name] = traefikConfigMiddleware{
+					StripPrefix: traefikConfigStripPrefix{
+						Prefixes: []string{prefix},
+					},
+				}
+
 			}
 		}
 	}
 
-	configFile := `http:
-  routers:` + routers + `
-  services:` + services + `
-  middlewares:` + middlewares + `
-`
+	config := traefikConfig{
+		HTTP: traefikConfigHTTP{
+			Routers:     rtrs,
+			Services:    srvcs,
+			Middlewares: mdls,
+		},
+	}
 
-	configMap.Data[workspaceID+".yml"] = configFile
+	contents, err := yaml.Marshal(config)
+	if err != nil {
+		return []corev1.ConfigMap{}, err
+	}
 
-	return []corev1.ConfigMap{configMap}
+	configMap.Data[workspaceID+".yml"] = string(contents)
+
+	return []corev1.ConfigMap{configMap}, nil
 }
 
 func (c *CheRoutingSolver) singlehostFinalize(cheManager *dwoche.CheManager, routing *dwo.WorkspaceRouting) error {
