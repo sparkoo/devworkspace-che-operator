@@ -44,6 +44,19 @@ type CheReconciler struct {
 	syncer  datasync.Syncer
 }
 
+// GetCurrentManagers returns a map of all che managers (keyed by their namespaced name)
+// the the che manager controller currently knows of. This returns any meaningful data
+// only after reconciliation has taken place.
+//
+// If this method is called from another controller, it effectively couples that controller
+// with the che manager controller. Such controller will therefore have to run in the same
+// process as the che manager controller. On the other hand, using this method, and somehow
+// tolerating its eventual consistency, makes the other controller more efficient such that
+// it doesn't have to find the che managers in the cluster (which is what che manager reconciler
+// is doing).
+//
+// If need be, this method can be replaced by a simply calling client.List to get all the che
+// managers in the cluster.
 func GetCurrentManagers() map[client.ObjectKey]v1alpha1.CheManager {
 	managerAccess.Lock()
 	defer managerAccess.Unlock()

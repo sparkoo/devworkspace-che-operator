@@ -205,5 +205,7 @@ func findCheManager(cheManagerKey client.ObjectKey) (*v1alpha1.CheManager, error
 		return &m, nil
 	}
 
-	return &v1alpha1.CheManager{}, &solvers.RoutingInvalid{Reason: fmt.Sprintf("the routing specifies Che manager %s/%s but there is no such object in the cluster", cheManagerKey.Namespace, cheManagerKey.Name)}
+	logger.Info("Routing requires a non-existing che manager. Retrying in 10 seconds.", "key", cheManagerKey)
+
+	return &v1alpha1.CheManager{}, &solvers.RoutingNotReady{Retry: 10 * time.Second}
 }
