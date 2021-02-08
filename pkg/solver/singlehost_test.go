@@ -74,6 +74,9 @@ func getSpecObjects(t *testing.T, routing *dwo.WorkspaceRouting) (client.Client,
 		t.Fatal(err)
 	}
 
+	// now we need a second round of che manager reconciliation so that it proclaims the che gateway as established
+	cheRecon.Reconcile(reconcile.Request{NamespacedName: types.NamespacedName{Name: "che", Namespace: "ns"}})
+
 	return cl, solver, objs
 }
 
@@ -93,15 +96,20 @@ func simpleWorkspaceRouting() *dwo.WorkspaceRouting {
 						TargetPort: 9999,
 						Exposure:   dw.PublicEndpointExposure,
 						Protocol:   "https",
-						Path:       "/1",
+						Path:       "/1/",
 					},
 					{
 						Name:       "e2",
 						TargetPort: 9999,
 						Exposure:   dw.PublicEndpointExposure,
 						Protocol:   "http",
-						Path:       "/2",
+						Path:       "/2.js",
 						Secure:     true,
+					},
+					{
+						Name:       "e3",
+						TargetPort: 9999,
+						Exposure:   dw.PublicEndpointExposure,
 					},
 				},
 			},
@@ -195,6 +203,57 @@ func TestCreateObjects(t *testing.T) {
 			t.Fatal("traefik config doesn't contain expected workspace configuration")
 		}
 	})
+}
+
+func TestReportExposedEndpoints(t *testing.T) {
+	routing := simpleWorkspaceRouting()
+	_, solver, objs := getSpecObjects(t, routing)
+
+	exposed, ready, err := solver.GetExposedEndpoints(routing.Spec.Endpoints, objs)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !ready {
+		t.Errorf("The exposed endpoints should have been ready.")
+	}
+
+	if len(exposed) != 1 {
+		t.Errorf("There should have been 1 exposed endpoins but found %d", len(exposed))
+	}
+
+	m1, ok := exposed["m1"]
+	if !ok {
+		t.Errorf("The exposed endpoints should have been defined on the m1 machine.")
+	}
+
+	if len(m1) != 3 {
+		t.Fatalf("There should have been 3 endpoints for m1.")
+	}
+
+	e1 := m1[0]
+	if e1.Name != "e1" {
+		t.Errorf("The first endpoint should have been e1 but is %s", e1.Name)
+	}
+	if e1.Url != "https://over.the.rainbow/wsid/m1/9999/1/" {
+		t.Errorf("The e1 endpoint should have the following URL: '%s' but has '%s'.", "https://over.the.rainbow/wsid/m1/9999/1/", e1.Url)
+	}
+
+	e2 := m1[1]
+	if e2.Name != "e2" {
+		t.Errorf("The second endpoint should have been e2 but is %s", e1.Name)
+	}
+	if e2.Url != "https://over.the.rainbow/wsid/m1/9999/2.js" {
+		t.Errorf("The e2 endpoint should have the following URL: '%s' but has '%s'.", "https://over.the.rainbow/wsid/m1/9999/2.js", e2.Url)
+	}
+
+	e3 := m1[2]
+	if e3.Name != "e3" {
+		t.Errorf("The third endpoint should have been e3 but is %s", e1.Name)
+	}
+	if e3.Url != "http://over.the.rainbow/wsid/m1/9999/" {
+		t.Errorf("The e3 endpoint should have the following URL: '%s' but has '%s'.", "https://over.the.rainbow/wsid/m1/9999/", e3.Url)
+	}
 }
 
 func TestFinalize(t *testing.T) {
