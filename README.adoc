@@ -26,9 +26,8 @@ describes the desired state of the Che infra - the routing type (singlehost or m
 == Workspace Routing Controller
 
 This controller is in charge of exposing the workspace endpoints by reconciling the `WorkspaceRouting` objects that are themselves managed
-by the main devworkspace operator. For this controller to handle the endpoints of a workspace, the `DevWorkspace` object describing the workspace needs to have the `routingClass` property set to `che`.
-
-NOTE: At the moment, there is only a skeleton implementation that does nothing.
+by the main devworkspace operator. For this controller to handle the endpoints of a workspace, the `DevWorkspace` object describing the 
+workspace needs to have the `routingClass` property set to `che`.
 
 == Build
 
