@@ -16,6 +16,7 @@ import (
 	"context"
 	"fmt"
 	"path"
+	"strings"
 
 	dwoche "github.com/che-incubator/devworkspace-che-operator/apis/che-controller/v1alpha1"
 	"github.com/che-incubator/devworkspace-che-operator/pkg/defaults"
@@ -146,6 +147,11 @@ func (c *CheRoutingSolver) singlehostExposedEndpoints(manager *dwoche.CheManager
 			publicURLPrefix := getPublicURLPrefixForEndpoint(workspaceID, machineName, endpoint)
 
 			publicURL := scheme + "://" + path.Join(host, publicURLPrefix, endpoint.Path)
+
+			// path.Join() removes the trailing slashes, so make sure to reintroduce that if required.
+			if endpoint.Path == "" || strings.HasSuffix(endpoint.Path, "/") {
+				publicURL = publicURL + "/"
+			}
 
 			attrs := map[string]string{}
 			err := endpoint.Attributes.Into(&attrs)
