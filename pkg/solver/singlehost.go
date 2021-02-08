@@ -145,7 +145,7 @@ func (c *CheRoutingSolver) singlehostExposedEndpoints(manager *dwoche.CheManager
 
 			publicURLPrefix := getPublicURLPrefixForEndpoint(workspaceID, machineName, endpoint)
 
-			publicURL := scheme + "://" + path.Join(host, publicURLPrefix, endpoint.Path)
+			publicURL := scheme + "://" + path.Join(host, publicURLPrefix, endpoint.Path) + "/"
 
 			attrs := map[string]string{}
 			err := endpoint.Attributes.Into(&attrs)
