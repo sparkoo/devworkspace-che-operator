@@ -1,6 +1,6 @@
 
 # Image URL to use all building/pushing image targets
-IMG ?= controller:latest
+IMG ?= quay.io/che-incubator/devworkspace-che-operator:latest
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
 CRD_OPTIONS ?= "crd:trivialVersions=true"
 
@@ -9,6 +9,22 @@ ifeq (,$(shell go env GOBIN))
 GOBIN=$(shell go env GOPATH)/bin
 else
 GOBIN=$(shell go env GOBIN)
+endif
+
+ifeq (,$(shell which kubectl))
+ifeq (,$(shell which oc))
+$(error oc or kubectl is required to proceed)
+else
+K8S_CLI := oc
+endif
+else
+K8S_CLI := kubectl
+endif
+
+ifeq ($(shell $(CLI) api-resources --api-group='route.openshift.io'  2>&1 | grep -o routes),routes)
+PLATFORM := openshift
+else
+PLATFORM := kubernetes
 endif
 
 all: manager
@@ -30,20 +46,23 @@ debug: generate fmt vet manifests
 	
 ### install: Install CRDs into a cluster
 install: manifests
-	kustomize build config/crd | kubectl apply -f -
+	kustomize build deploy/templates/crd | $(K8S_CLI) apply -f -
 
 ### uninstall: Uninstall CRDs from a cluster
 uninstall: manifests
-	kustomize build config/crd | kubectl delete -f -
+	kustomize build deploy/templates/crd | $(K8S_CLI) delete -f -
 
 ### deploy: Deploy controller in the configured Kubernetes cluster in ~/.kube/config
-deploy: manifests
-	cd config/manager && kustomize edit set image controller=${IMG}
-	kustomize build config/default | kubectl apply -f -
+deploy: generate_deployment
+	$(K8S_CLI) apply -f deploy/deployment/$(PLATFORM)/combined.yaml
+
+### generate_deployment: generates the deployment files in deploy/deployment
+generate_deployment: manifests
+	deploy/generate-deployment.sh
 
 ### manifests: Generate manifests e.g. CRD, RBAC etc.
 manifests: controller-gen
-	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=deploy/templates/crd/bases
 
 ### fmt: Run go fmt against code
 fmt:
@@ -59,7 +78,7 @@ generate: controller-gen
 
 ### docker-build: Build the docker image
 docker-build: test
-	docker build . -t ${IMG} -f build/Dockerfile
+	docker build . -t ${IMG} -f build/dockerfiles/Dockerfile
 
 ### docker-push: Push the docker image
 docker-push:

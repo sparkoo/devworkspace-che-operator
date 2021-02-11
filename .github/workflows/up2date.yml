@@ -1,0 +1,62 @@
+#
+# Copyright (c) 2020 Red Hat, Inc.
+# This program and the accompanying materials are made
+# available under the terms of the Eclipse Public License 2.0
+# which is available at https://www.eclipse.org/legal/epl-2.0/
+#
+# SPDX-License-Identifier: EPL-2.0
+#
+# Contributors:
+#   Red Hat, Inc. - initial API and implementation
+#
+
+name: Check Generated Files
+
+on:
+  pull_request:
+    branches:
+      - 'master'
+      - 'v*'
+    paths-ignore:
+      - '**.md'
+
+jobs:
+
+  go:
+    runs-on: ubuntu-20.04
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v2.3.1
+      -
+        name: Prepare
+        id: prepare
+        run: |
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            echo ::set-output name=tag_name::${GITHUB_REF#refs/tags/}
+          fi
+      -
+        name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.13
+      -
+        name: Cache Go modules
+        uses: actions/cache@v2
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+      -
+        name: Go mod
+        run: go mod download
+      -
+        name: Check Generated Files
+        id: up2date
+        run: |
+          make generate generate_deployment
+          if [[ ! -z $(git status -s) ]]; then
+            echo "Generated files are out of date. Run `make generate generate_deployment` and push again."
+            exit 1
+          fi

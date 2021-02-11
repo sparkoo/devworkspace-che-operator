@@ -34,19 +34,20 @@ rules:
   - services
   verbs:
   - '*'
-- apiGroups:
-  - admissionregistration.k8s.io
-  resources:
-  - mutatingwebhookconfigurations
-  - validatingwebhookconfigurations
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
+# We don't have any webhooks yet  
+# - apiGroups:
+#   - admissionregistration.k8s.io
+#   resources:
+#   - mutatingwebhookconfigurations
+#   - validatingwebhookconfigurations
+#   verbs:
+#   - create
+#   - delete
+#   - get
+#   - list
+#   - patch
+#   - update
+#   - watch
 - apiGroups:
   - apps
   resourceNames:
@@ -100,13 +101,13 @@ rules:
 - apiGroups:
   - che.eclipse.org
   resources:
-  - cherouters
+  - chemanagers
   verbs:
   - '*'
 - apiGroups:
   - che.eclipse.org
   resources:
-  - cherouters/status
+  - chemanagers/status
   verbs:
   - get
   - patch
