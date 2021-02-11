@@ -36,6 +36,11 @@ jobs:
             echo ::set-output name=tag_name::${GITHUB_REF#refs/tags/}
           fi
       -
+        name: Set up Python 3.8
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.8
+      -
         name: Set up Go
         uses: actions/setup-go@v2
         with:
@@ -51,6 +56,8 @@ jobs:
       -
         name: Go mod
         run: go mod download
+      - name: Install yq
+        run: pip install yq
       -
         name: Check Generated Files
         id: up2date
