@@ -64,6 +64,7 @@ jobs:
         run: |
           make generate generate_deployment
           if [[ ! -z $(git status -s) ]]; then
-            echo "Generated files are out of date. Run `make generate generate_deployment` and push again."
+            echo "Generated files are out of date. Run 'make generate generate_deployment' and push again."
+            git diff
             exit 1
           fi
