@@ -123,6 +123,18 @@ echo "Using envsubst $(envsubst --version | head -1 | cut -d' ' -f4)"
 echo "Using csplit $(csplit --version | head -1 | cut -d' ' -f4)"
 echo "Using yq $(yq --version | head -1 | cut -d' ' -f2)"
 
+# check that we're using compatible versions of the tools
+KUSTOMIZE_VERSION=$(kustomize version | cut -d: -f2 | cut -d' ' -f1 | awk -F '/v' '{print $2}')
+EXPECTED_KUSTOMIZE_VERSION="3.9.3"
+if [[ $KUSTOMIZE_VERSION != $EXPECTED_KUSTOMIZE_VERSION ]]; then
+    echo "The last known version of kustomize in Github actions is $EXPECTED_KUSTOMIZE_VERSION but we're using $KUSTOMIZE_VERSION."
+    echo
+    echo "If you see this message on Github action, that version changed and you need to upgrade this script (deploy/generate-deployment.sh)."
+    echo "If you see this locally, make sure to install kustomize $EXPECTED_KUSTOMIZE_VERSION:"
+    echo "curl -s \"https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh\" | bash -s $EXPECTED_KUSTOMIZE_VERSION"
+    exit 1
+fi
+
 #space separated list of templates to interpolate
 TEMPLATES="templates/base/kustomization.yaml templates/base/manager_image_patch.yaml"
 
