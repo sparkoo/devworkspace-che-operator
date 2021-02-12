@@ -118,6 +118,11 @@ for bin in kustomize envsubst csplit yq; do
     fi
 done
 
+echo "Using kustomize $(kustomize version)"
+echo "Using envsubst $(envsubst --version | head -1 | cut -d' ' -f4)"
+echo "Using csplit $(csplit --version | head -1 | cut -d' ' -f4)"
+echo "Using yq $(yq --version | head -1 | cut -d' ' -f2)"
+
 #space separated list of templates to interpolate
 TEMPLATES="templates/base/kustomization.yaml templates/base/manager_image_patch.yaml"
 
