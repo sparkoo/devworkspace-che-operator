@@ -460,7 +460,7 @@ spec:
           value: docker.io/traefik:v2.2.8
         - name: RELATED_IMAGE_gateway_configurer
           value: quay.io/che-incubator/configbump:0.1.4
-        image: quay.io/lkrejci/devworkspace-che-operator:test
+        image: quay.io/che-incubator/devworkspace-che-operator:latest
         name: devworkspace-che-operator
         resources:
           limits:
