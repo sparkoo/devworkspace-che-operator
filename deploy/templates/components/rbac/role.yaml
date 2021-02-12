@@ -121,6 +121,12 @@ rules:
 - apiGroups:
   - controller.devfile.io
   resources:
+  - workspaceroutings/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - controller.devfile.io
+  resources:
   - workspaceroutings/status
   verbs:
   - get
