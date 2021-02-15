@@ -58,7 +58,7 @@ deploy: generate_deployment
 
 ### generate_deployment: generates the deployment files in deploy/deployment
 generate_deployment: manifests
-	deploy/generate-deployment.sh
+	deploy/generate-deployment.sh --split-yaml
 
 ### manifests: Generate manifests e.g. CRD, RBAC etc.
 manifests: controller-gen
