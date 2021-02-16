@@ -32,7 +32,6 @@ SCRIPT_DIR=$(cd "$(dirname "$0")"; pwd)
 DEFAULT_NAMESPACE=devworkspace-che
 DEFAULT_IMG=quay.io/che-incubator/devworkspace-che-operator:latest
 DEFAUlT_PULL_POLICY=Always
-DEFAULT_FORCE_CRD_UPDATES=true
 DEFAULT_OUTPUT_DIR="${SCRIPT_DIR%/}/deployment"
 
 function print_help() {
@@ -54,7 +53,6 @@ function print_help() {
   echo "NAMESPACE=${DEFAULT_NAMESPACE}"
   echo "IMG=${DEFAULT_IMG}"
   echo "PULL_POLICY=${DEFAULT_PULL_POLICY}"
-  echo "FORCE_CRD_UPDATES=${DEFAULT_FORCE_CRD_UPDATES}"
   echo "OUTPUT_DIR=${DEFAULT_OUTPUT_DIR}"
 }
 
@@ -90,13 +88,11 @@ if $USE_DEFAULT_ENV; then
     export NAMESPACE="${DEFAULT_NAMESPACE}"
     export IMG="${DEFAULT_IMG}"
     export PULL_POLICY="${DEFAULT_PULL_POLICY}"
-    export FORCE_CRD_UPDATES="${DEFAULT_FORCE_CRD_UPDATES}"
     export OUTPUT_DIR="${DEFAULT_OUTPUT_DIR}"
 else
     export NAMESPACE="${NAMESPACE:-$DEFAULT_NAMESPACE}"
     export IMG=${IMG:-$DEFAULT_IMG}
     export PULL_POLICY=${PULL_POLICY:-$DEFAULT_PULL_POLICY}
-    export FORCE_CRD_UPDATES=${FORCE_CRD_UPDATES:-$DEFAULT_FORCE_CRD_UPDATES}
     export OUTPUT_DIR=${OUTPUT_DIR:-$DEFAULT_OUTPUT_DIR}
 fi
 

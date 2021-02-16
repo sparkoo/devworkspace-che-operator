@@ -1,4 +1,4 @@
-namespace: devworkspace-che
+namespace: ${NAMESPACE}
 
 namePrefix: devworkspace-che-
 
