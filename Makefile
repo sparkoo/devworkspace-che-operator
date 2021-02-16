@@ -21,7 +21,7 @@ else
 K8S_CLI := kubectl
 endif
 
-ifeq ($(shell $(CLI) api-resources --api-group='route.openshift.io'  2>&1 | grep -o routes),routes)
+ifeq ($(shell $(K8S_CLI) api-resources --api-group='route.openshift.io'  2>&1 | grep -o routes),routes)
 PLATFORM := openshift
 else
 PLATFORM := kubernetes
